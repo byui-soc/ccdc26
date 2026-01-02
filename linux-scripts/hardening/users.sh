@@ -8,16 +8,15 @@ require_root
 header "User Account Hardening"
 
 #=============================================================================
-# CONFIGURATION - EDIT THESE FOR YOUR COMPETITION
+# CONFIGURATION
 #=============================================================================
 # Add your authorized users here (space-separated)
-AUTHORIZED_USERS="root"  # Add your team's users: "root admin operator"
+AUTHORIZED_USERS="root"
 
 # Users that should have sudo access (space-separated)
-AUTHORIZED_SUDO="root"   # Add sudo users: "root admin"
+AUTHORIZED_SUDO="root"
 
 # Password to set for all users (or leave empty to generate random)
-# In competition, you probably want to set this to something your team knows
 TEAM_PASSWORD=""
 
 #=============================================================================
@@ -224,7 +223,7 @@ set_password_policy() {
 }
 
 #=============================================================================
-# LOCK ROOT DIRECT LOGIN (Optional - use with caution)
+# LOCK ROOT DIRECT LOGIN
 #=============================================================================
 secure_root() {
     header "Securing Root Account"
