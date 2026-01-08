@@ -104,12 +104,8 @@ function create_ccdc_users {
             elif [ -f "/bin/sh" ]; then
                 sudo useradd -m -s /bin/sh "$user"
             else
-                log_warning "Could not find valid shell (bash or sh)"
-                log_info "Attempting user creation with system default shell"
-                sudo useradd -m "$user" || {
-                    log_error "Failed to create user $user"
-                    continue
-                }
+                log_error "ERROR: Could not find valid shell"
+                exit 1
             fi
             if [[ "$user" == "ccdcuser1" ]]; then
                 log_info "Enter the password for $user:"
@@ -172,15 +168,6 @@ function change_passwords {
         return 0
     fi
     print_banner "Changing user passwords"
-    
-    # Ask if user wants to change passwords
-    local proceed
-    proceed=$(get_input_string "Would you like to change passwords for all users? (y/N): ")
-    if [[ ! "$proceed" =~ ^[Yy]$ ]]; then
-        log_info "Skipping password changes."
-        return 0
-    fi
-    
     exclusions=("root" "${ccdc_users[@]}")
     log_info "Currently excluded users: ${exclusions[*]}"
     log_info "Would you like to exclude any additional users?"
@@ -220,15 +207,6 @@ function disable_users {
         return 0
     fi
     print_banner "Disabling users"
-    
-    # Ask if user wants to disable users
-    local proceed
-    proceed=$(get_input_string "Would you like to disable unauthorized user accounts? (y/N): ")
-    if [[ ! "$proceed" =~ ^[Yy]$ ]]; then
-        log_info "Skipping user account disabling."
-        return 0
-    fi
-    
     exclusions=("${ccdc_users[@]}")
     exclusions+=("root")
     log_info "Currently excluded users: ${exclusions[*]}"

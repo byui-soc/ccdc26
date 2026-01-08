@@ -146,40 +146,37 @@ Note: The HOSTS FILE is required for the 'full' and 'scan' options. The file sho
 "
 }
 
-# Only run command-line parsing if this script is executed directly (not sourced)
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  # Ensure at least one argument is provided.
-  if [ $# -lt 1 ]; then
-    print_options
-    exit 1
-  fi
+# Ensure at least one argument is provided.
+if [ $# -lt 1 ]; then
+  print_options
+  exit 1
+fi
 
-  # Parse command-line options.
-  case $1 in
-    "full")
-      if [ $# -lt 2 ]; then
-        print_options
-        exit 1
-      fi
-      setup_scripts 
-      scan_hosts "$2"
-      ;;
-    "setup")
-      setup_scripts
-      ;;
-    "scan")
-      if [ $# -lt 2 ]; then
-        print_options
-        exit 1
-      fi
-      scan_hosts "$2"
-      ;;
-    "help")
-      print_options
-      ;;
-    *)
+# Parse command-line options.
+case $1 in
+  "full")
+    if [ $# -lt 2 ]; then
       print_options
       exit 1
-      ;;
-  esac
-fi
+    fi
+    setup_scripts 
+    scan_hosts "$2"
+    ;;
+  "setup")
+    setup_scripts
+    ;;
+  "scan")
+    if [ $# -lt 2 ]; then
+      print_options
+      exit 1
+    fi
+    scan_hosts "$2"
+    ;;
+  "help")
+    print_options
+    ;;
+  *)
+    print_options
+    exit 1
+    ;;
+esac

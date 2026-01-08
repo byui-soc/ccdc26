@@ -43,9 +43,8 @@ function configure_security_modules {
                 # Usually openSUSE-based
                 setup_apparmor_debian
             else
-                log_warning "Could not determine how to install SELinux or AppArmor on this OS."
-                log_info "Skipping security module installation - install manually if needed"
-                return 0
+                log_error "Could not determine how to install SELinux or AppArmor on this OS. Aborting."
+                return 1
             fi
             ;;
     esac
@@ -65,9 +64,8 @@ function setup_selinux_rhel {
     elif command -v dnf &>/dev/null; then
         sudo dnf install -y selinux-policy selinux-policy-targeted policycoreutils
     else
-        log_warning "No recognized package manager found for SELinux installation."
-        log_info "Skipping SELinux setup - install manually if needed"
-        return 0
+        log_error "No recognized package manager found for SELinux installation on a RHEL-like OS."
+        return 1
     fi
 
     log_info "Ensuring SELinux is set to enforcing..."
@@ -116,14 +114,12 @@ function setup_apparmor_debian {
         sudo zypper refresh
         sudo zypper install -y apparmor-profiles apparmor-utils
         # In openSUSE, AppArmor might already be installed and enabled by default
-        if command -v systemctl &>/dev/null; then
-            sudo systemctl enable apparmor
-            sudo systemctl start apparmor
-        fi
+        # etc.
+        sudo systemctl enable apparmor
+        sudo systemctl start apparmor
         log_info "AppArmor installed/enabled under openSUSE."
     else
-        log_warning "Could not find apt-get or zypper for AppArmor installation."
-        log_info "Skipping AppArmor setup - install manually if needed."
-        return 0
+        log_error "Could not find apt-get or zypper. Aborting AppArmor setup."
+        return 1
     fi
 }

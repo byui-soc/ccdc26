@@ -104,9 +104,8 @@ detect_layout() {
         RELOAD_CMD="systemctl reload httpd || service httpd reload"
         CTL="apachectl"
     else
-        log_warning "Apache configuration directory not found. Expected /etc/apache2 or /etc/httpd."
-        log_info "Skipping Apache User-Agent blocker installation"
-        return 1
+        log_error "Apache configuration directory not found. Expected /etc/apache2 or /etc/httpd."
+        exit 1
     fi
     mkdir -p "$CONF_DIR" "$LOG_DIR"
     log_verbose "Using Apache configuration directory $CONF_DIR"
@@ -249,10 +248,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Main execution - only run when script is executed directly, not when sourced
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+# Main
 
-detect_layout || exit 1
+detect_layout
 enable_module setenvif
 enable_module authz_core
 enable_module log_config
@@ -325,5 +323,3 @@ log_info "Block log located at ${LOG_DIR}/ua_block.log"
 log_verbose "UA list cache stored at $CACHE_LIST"
 log_info "Whitelisted IPs: ${WHITELIST_IPS:-none}"
 log_info "Whitelisted UAs: ${WHITELIST_UA:-none}"
-
-fi  # End of main execution block

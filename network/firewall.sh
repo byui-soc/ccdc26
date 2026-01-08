@@ -29,8 +29,8 @@ function detect_system_info {
         log_info "yum detected (RHEL-based OS)"
         pm="yum"
     else
-        log_warning "Could not detect package manager - some features may not work"
-        pm="manual"
+        log_error "ERROR: Could not detect package manager"
+        exit 1
     fi
 
     log_info "Detecting sudo group"
@@ -43,8 +43,8 @@ function detect_system_info {
         log_info "wheel group detected"
         sudo_group='wheel'
     else
-        log_warning "Could not detect sudo/wheel group - defaulting to 'sudo'"
-        sudo_group='sudo'
+        log_error "ERROR: could not detect sudo group"
+        exit 1
     fi
 }
 
@@ -92,7 +92,7 @@ function ensure_iptables_persistence {
         if ! command -v netfilter-persistent >/dev/null 2>&1; then
             log_info "Installing iptables-persistent (provides netfilter-persistent)"
             sudo DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent || {
-                log_warning "Failed to install iptables-persistent. Firewall rules may not persist across reboots."; }
+                log_error "Failed to install iptables-persistent"; return 1; }
         fi
         sudo systemctl enable netfilter-persistent >/dev/null 2>&1 || true
         log_info "netfilter-persistent enabled for boot-time restore"
@@ -100,7 +100,7 @@ function ensure_iptables_persistence {
         if ! systemctl list-unit-files | awk '{print $1}' | grep -qx "iptables.service"; then
             log_info "Installing iptables-services for boot-time restore"
             sudo dnf install -y iptables-services 2>/dev/null || sudo yum install -y iptables-services || {
-                log_warning "Failed to install iptables-services. Firewall rules may not persist across reboots."; }
+                log_error "Failed to install iptables-services"; return 1; }
         fi
         sudo systemctl enable iptables >/dev/null 2>&1 || true
         log_info "iptables.service enabled for boot-time restore"
@@ -195,29 +195,8 @@ function restore_ufw_rules {
 
 function setup_ufw {
     print_banner "Configuring ufw"
-    
-    # Check if we have a real package manager
-    if [ "$pm" == "manual" ]; then
-        log_warning "No package manager detected - cannot install UFW automatically"
-        log_info "Skipping UFW configuration - install UFW manually if needed"
-        return 0
-    fi
-    
-    # Try to install UFW
-    if ! sudo $pm install -y ufw; then
-        log_warning "Failed to install UFW"
-        log_info "Skipping UFW configuration"
-        return 0
-    fi
-    
-    # Verify UFW is now available
-    if ! command -v ufw &>/dev/null; then
-        log_warning "UFW command not available after installation attempt"
-        log_info "Skipping UFW configuration"
-        return 0
-    fi
-    
-    sudo sed -i 's/^IPV6=yes/IPV6=no/' /etc/default/ufw 2>/dev/null || true
+    sudo $pm install -y ufw
+    sudo sed -i 's/^IPV6=yes/IPV6=no/' /etc/default/ufw
     sudo ufw --force disable
     sudo ufw --force reset
     sudo ufw default deny outgoing
@@ -263,9 +242,8 @@ function genPortList() {
 function iptables_base_policy_interactive {
     print_banner "Interactive IPtables Base Policy (DSU-style)"
     if [ "$EUID" != 0 ]; then
-        log_warning "This function requires root privileges"
-        log_info "Skipping interactive iptables configuration - rerun with sudo if needed"
-        return 0
+        log_error "Please run with sudo/root"
+        return 1
     fi
 
     # Optional flush if rules already exist
@@ -292,7 +270,7 @@ function iptables_base_policy_interactive {
     fi
 
     # SSH client detection
-    if [ -n "${SSH_CLIENT:-}" ]; then
+    if [ -n "$SSH_CLIENT" ]; then
         echo 'SSH Detected. Whitelist client? (Y/n)'
         yesno y && sudo iptables -A INPUT -s "$(cut -f1 -d' ' <<<"$SSH_CLIENT")" -p tcp --dport 22 -j ACCEPT
     fi

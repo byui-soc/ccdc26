@@ -3,30 +3,25 @@
 function setup_proxy_certificates_and_config {
     print_banner "Proxy and Certificate Configuration Setup"
 
-    if [ "$ANSIBLE" == "true" ]; then
-        log_info "Ansible mode: Skipping interactive proxy configuration"
-        return 0
-    fi
-
     # Prompt the user for required URLs
     read -p "Enter the Proxy URL (e.g., http://192.168.1.107:8000): " user_proxy
     if [ -z "$user_proxy" ]; then
-        log_info "No proxy URL provided - skipping proxy configuration"
-        return 0
+        log_error "No proxy URL provided. Aborting configuration."
+        return 1
     fi
     PROXY="$user_proxy"
 
     read -p "Enter the Certificate CRT URL (e.g., http://192.168.1.107:9000/mitmproxy-ca-cert.crt): " user_patch_url
     if [ -z "$user_patch_url" ]; then
-        log_info "No certificate CRT URL provided - skipping proxy configuration"
-        return 0
+        log_error "No certificate CRT URL provided. Aborting configuration."
+        return 1
     fi
     PATCH_URL="$user_patch_url"
 
     read -p "Enter the Certificate PEM URL (e.g., http://192.168.1.107:9000/mitmproxy-ca-cert.pem): " user_pem_url
     if [ -z "$user_pem_url" ]; then
-        log_info "No certificate PEM URL provided - skipping proxy configuration"
-        return 0
+        log_error "No certificate PEM URL provided. Aborting configuration."
+        return 1
     fi
     PEM_URL="$user_pem_url"
 
@@ -34,7 +29,7 @@ function setup_proxy_certificates_and_config {
     log_info "CRT will be downloaded from: $PATCH_URL"
     log_info "PEM will be downloaded from: $PEM_URL"
 
-    # Now, detect which OS we're running and call the corresponding helper.
+    # Now, detect which OS weâ€™re running and call the corresponding helper.
     if command -v yum &>/dev/null ; then
         RHEL_proxy_setup
     elif command -v apt-get &>/dev/null ; then
@@ -48,9 +43,8 @@ function setup_proxy_certificates_and_config {
     elif command -v slapt-get &>/dev/null || grep -qi Slackware /etc/os-release ; then
         SLACK_proxy_setup
     else
-        log_warning "Unsupported or unknown OS for proxy/certificate configuration."
-        log_info "Skipping proxy setup - configure manually if needed"
-        return 0
+        log_error "Unsupported or unknown OS for proxy/certificate configuration."
+        return 1
     fi
 
     log_info "Proxy and certificate configuration completed."

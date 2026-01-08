@@ -4,10 +4,10 @@ function kill_other_sessions {
     # Get the current TTY device (e.g., /dev/pts/0)
     local current_tty=$(tty 2>/dev/null)
     
-    # Check if TTY is valid; skip if not (might be non-interactive session)
+    # Check if TTY is valid; exit if not
     if [ -z "$current_tty" ]; then
-        log_info "Could not determine current TTY - skipping session termination (may be non-interactive)"
-        return 0
+        log_error "Error: Could not determine current TTY"
+        return 1
     fi
     
     # Get the current user (should be root since script requires root privileges)

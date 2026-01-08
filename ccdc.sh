@@ -35,6 +35,8 @@ CORE_WORKFLOW_STEPS=(
     "run_firewall_workflow"
     "run_ssh_workflow"
     "run_security_modules_workflow"
+    "run_proxy_workflow"
+    "backups"
     "maybe_setup_splunk"
     "defend_against_forkbomb"
     "remove_profiles"
@@ -289,17 +291,19 @@ function show_core_menu {
         echo "3) Firewall configuration"
         echo "4) SSH hardening"
         echo "5) Security modules"
-        echo "6) Splunk installation"
-        echo "7) Defend against forkbomb"
-        echo "8) Remove user profiles"
-        echo "9) Fix PAM configuration"
-        echo "10) Search for SSNs"
-        echo "11) Remove unused packages"
-        echo "12) Patch vulnerabilities"
-        echo "13) Check permissions"
-        echo "14) Apply sysctl hardening"
-        echo "15) Return to main menu"
-        read -r -p "Enter your choice [1-15]: " core_choice
+        echo "6) Proxy and certificate configuration"
+        echo "7) Backups"
+        echo "8) Splunk installation"
+        echo "9) Defend against forkbomb"
+        echo "10) Remove user profiles"
+        echo "11) Fix PAM configuration"
+        echo "12) Search for SSNs"
+        echo "13) Remove unused packages"
+        echo "14) Patch vulnerabilities"
+        echo "15) Check permissions"
+        echo "16) Apply sysctl hardening"
+        echo "17) Return to main menu"
+        read -r -p "Enter your choice [1-17]: " core_choice
         echo
         case "$core_choice" in
             1)
@@ -322,41 +326,49 @@ function show_core_menu {
                 ;;
             6)
                 initialize_environment
-                maybe_setup_splunk
+                run_proxy_workflow
                 ;;
             7)
                 initialize_environment
-                run_if_exists defend_against_forkbomb
+                run_if_exists backups
                 ;;
             8)
                 initialize_environment
-                run_if_exists remove_profiles
+                maybe_setup_splunk
                 ;;
             9)
                 initialize_environment
-                run_if_exists fix_pam
+                run_if_exists defend_against_forkbomb
                 ;;
             10)
                 initialize_environment
-                run_if_exists search_ssn
+                run_if_exists remove_profiles
                 ;;
             11)
                 initialize_environment
-                run_if_exists remove_unused_packages
+                run_if_exists fix_pam
                 ;;
             12)
                 initialize_environment
-                run_if_exists patch_vulnerabilities
+                run_if_exists search_ssn
                 ;;
             13)
                 initialize_environment
-                run_if_exists check_permissions
+                run_if_exists remove_unused_packages
                 ;;
             14)
                 initialize_environment
-                run_if_exists sysctl_config
+                run_if_exists patch_vulnerabilities
                 ;;
             15)
+                initialize_environment
+                run_if_exists check_permissions
+                ;;
+            16)
+                initialize_environment
+                run_if_exists sysctl_config
+                ;;
+            17)
                 log_info "Returning to main menu..."
                 break
                 ;;

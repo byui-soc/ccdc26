@@ -26,9 +26,8 @@ function detect_system_info {
         log_info "yum detected (RHEL-based OS)"
         pm="yum"
     else
-        log_warning "Could not detect package manager - some features may not work"
-        log_info "Defaulting to manual package management"
-        pm="manual"
+        log_error "ERROR: Could not detect package manager"
+        exit 1
     fi
 
     log_info "Detecting sudo group"
@@ -41,8 +40,8 @@ function detect_system_info {
         log_info "wheel group detected"
         sudo_group='wheel'
     else
-        log_warning "Could not detect sudo/wheel group - defaulting to 'sudo'"
-        sudo_group='sudo'
+        log_error "ERROR: could not detect sudo group"
+        exit 1
     fi
 }
 

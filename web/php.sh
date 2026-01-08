@@ -2,12 +2,6 @@
 
 function secure_php_ini {
     print_banner "Securing php.ini Files"
-    
-    # Check if PHP is installed at all - skip silently if not
-    if ! command -v php &>/dev/null; then
-        log_info "PHP is not installed - skipping PHP hardening"
-        return 0
-    fi
 
     local php_ini_block='[PHP]
 engine = On

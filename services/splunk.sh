@@ -15,18 +15,16 @@ function setup_splunk {
     installer_path="$(mktemp /tmp/splunk-install.XXXXXX)"
 
     if ! wget --no-check-certificate "$installer_url" -O "$installer_path"; then
-        log_warning "Failed to download Splunk helper script from $installer_url"
+        log_error "Failed to download Splunk helper script from $installer_url"
         rm -f "$installer_path"
-        log_info "Skipping Splunk installation - download manually if needed"
-        return 0
+        return 1
     fi
 
     chmod +x "$installer_path"
     if ! "$installer_path" -f "$indexer_ip"; then
-        log_warning "Splunk installer script reported an error."
+        log_error "Splunk installer script reported an error."
         rm -f "$installer_path"
-        log_info "Skipping Splunk installation - check configuration and retry manually"
-        return 0
+        return 1
     fi
 
     rm -f "$installer_path"

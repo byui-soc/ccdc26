@@ -3,12 +3,6 @@
 function configure_login_banner {
     print_banner "Configuring Login Banner"
 
-    # Check if SSH is installed - skip SSH-specific config if not
-    local ssh_installed=false
-    if command -v sshd &>/dev/null || command -v ssh &>/dev/null || [ -f /etc/ssh/sshd_config ]; then
-        ssh_installed=true
-    fi
-
     # Unified pre-auth banner text (console + SSH)
     local default_banner="WARNING: UNAUTHORIZED ACCESS TO THIS NETWORK DEVICE IS PROHIBITED
 You must have explicit, authorized permission to access or configure this device.
@@ -25,22 +19,13 @@ By continuing to use this system you indicate your awareness of and consent to t
 All employees must take reasonable steps to prevent unauthorized access to the system, including protecting passwords and other login information.
 Employees are required to notify their administrators immediately of any known or suspected breach of security and to do their best to stop such a breach."
 
-    # Write banner to console (/etc/issue) - always do this
-    echo "$default_banner" | sudo tee /etc/issue >/dev/null
-    sudo chown root:root /etc/issue 2>/dev/null || true
-    sudo chmod 0644 /etc/issue 2>/dev/null || true
-    log_info "Login banner written to /etc/issue."
-
-    # Write banner to SSH file only if SSH is installed
-    if [ "$ssh_installed" = true ]; then
-        echo "$default_banner" | sudo tee /etc/issue.net >/dev/null
-        sudo chown root:root /etc/issue.net 2>/dev/null || true
-        sudo chmod 0644 /etc/issue.net 2>/dev/null || true
-        log_info "Login banner written to /etc/issue.net."
-    else
-        log_info "SSH not installed - skipping SSH banner configuration"
-        return 0
-    fi
+    # Write banner to BOTH console (/etc/issue) and SSH (/etc/issue.net)
+    for banner_file in /etc/issue /etc/issue.net; do
+        echo "$default_banner" | sudo tee "$banner_file" >/dev/null
+        sudo chown root:root "$banner_file" 2>/dev/null || true
+        sudo chmod 0644 "$banner_file" 2>/dev/null || true
+        log_info "Login banner written to $banner_file."
+    done
 
     # Configure sshd to use /etc/issue.net as the pre-auth Banner
     local ssh_config="/etc/ssh/sshd_config"
@@ -52,7 +37,7 @@ Employees are required to notify their administrators immediately of any known o
 
         # Find correct SSH service name and restart safely
         local svc="sshd"
-        if systemctl list-unit-files 2>/dev/null | grep -q '^ssh\.service'; then
+        if systemctl list-unit-files | grep -q '^ssh\.service'; then
             svc="ssh"
         fi
 
@@ -60,18 +45,18 @@ Employees are required to notify their administrators immediately of any known o
             # Validate config before restart
             if sudo sshd -t 2>/dev/null; then
                 if command -v systemctl >/dev/null 2>&1; then
-                    sudo systemctl restart "$svc" 2>/dev/null || true
+                    sudo systemctl restart "$svc"
                 else
-                    sudo service "$svc" restart 2>/dev/null || true
+                    sudo service "$svc" restart
                 fi
                 log_info "SSH service ($svc) restarted."
             else
-                log_warning "sshd_config test failed; not restarting. Please review $ssh_config."
+                log_error "sshd_config test failed; not restarting. Please review $ssh_config."
             fi
         else
             # Fallback restart if sshd binary name differs
             if command -v systemctl >/dev/null 2>&1; then
-                sudo systemctl restart "$svc" 2>/dev/null || true
+                sudo systemctl restart "$svc" || true
             else
                 sudo service "$svc" restart || true
             fi
@@ -83,12 +68,6 @@ Employees are required to notify their administrators immediately of any known o
 
 function secure_ssh {
     print_banner "Securing SSH"
-    
-    # Check if SSH is available at all - skip silently if not
-    if ! command -v sshd &>/dev/null && ! command -v ssh &>/dev/null; then
-        log_info "SSH is not installed - skipping SSH hardening"
-        return 0
-    fi
 
     # Step 1: Check if SSH service is installed
     if command -v sshd &>/dev/null; then
@@ -109,9 +88,8 @@ function secure_ssh {
         elif command -v zypper &>/dev/null; then
             sudo zypper install -y openssh
         else
-            log_warning "Could not determine package manager to install SSH."
-            log_info "Skipping SSH hardening - SSH is not installed."
-            return 0
+            log_error "ERROR: Could not determine package manager to install SSH."
+            return 1
         fi
 
         # Verify installation
@@ -120,9 +98,8 @@ function secure_ssh {
         elif command -v ssh &>/dev/null; then
             service_name="ssh"
         else
-            log_warning "Failed to install SSH service."
-            log_info "Skipping SSH hardening - SSH could not be installed."
-            return 0
+            log_error "ERROR: Failed to install SSH service."
+            return 1
         fi
     fi
 
@@ -131,9 +108,8 @@ function secure_ssh {
         log_info "SSH service is not running. Attempting to start..."
         sudo systemctl start "$service_name"
         if ! sudo systemctl is-active --quiet "$service_name"; then
-            log_warning "Failed to start SSH service."
-            log_info "Skipping SSH hardening - SSH service could not be started."
-            return 0
+            log_error "ERROR: Failed to start SSH service."
+            return 1
         fi
     fi
 
@@ -146,9 +122,8 @@ function secure_ssh {
     # Step 4: Apply SSH hardening
     config_file="/etc/ssh/sshd_config"
     if [ ! -f "$config_file" ]; then
-        log_warning "SSH configuration file not found: $config_file"
-        log_info "SSH may not be properly installed. Skipping SSH hardening."
-        return 0
+        log_error "ERROR: SSH configuration file not found: $config_file"
+        return 1
     fi
 
     # Backup the original configuration file
@@ -188,10 +163,9 @@ function secure_ssh {
         sudo systemctl restart "$service_name"
         log_info "SSH hardening applied and $service_name restarted successfully."
     else
-        log_warning "SSH configuration test failed. Restoring original configuration."
+        log_error "ERROR: SSH configuration test failed. Restoring original configuration."
         sudo cp "${config_file}.bak" "$config_file"
-        sudo systemctl restart "$service_name" 2>/dev/null || true
-        log_info "SSH hardening skipped due to configuration issues - review manually"
-        return 0
+        sudo systemctl restart "$service_name"
+        return 1
     fi
 }

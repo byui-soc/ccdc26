@@ -158,8 +158,7 @@ ensure_crs_setup_profile() {
             log_info "Populating CRS setup file from $source"
             sudo cp "$source" "$destination"
         else
-            log_warning "Unable to locate a CRS setup template."
-            log_info "Install OWASP CRS package before configuring ModSecurity"
+            log_error "Unable to locate a CRS setup template. Install OWASP CRS before continuing."
             return 1
         fi
     else
@@ -174,25 +173,17 @@ ensure_crs_setup_profile() {
 }
 
 install_modsecurity_manual() {
-    # Check if apt-get is available (Debian-based only)
     if ! command -v apt-get >/dev/null 2>&1; then
-        log_info "Manual ModSecurity installation only supports Debian/Ubuntu - skipping"
-        return 0
-    fi
-    
-    # Check if Apache is installed
-    if ! command -v apache2 &>/dev/null && ! command -v apache2ctl &>/dev/null; then
-        log_info "Apache is not installed - skipping ModSecurity installation"
-        return 0
+        log_error "Manual ModSecurity installation is only implemented for Debian-based systems."
+        return 1
     fi
 
     log_info "Updating package list..."
     sudo apt-get update -qq
     log_info "Installing libapache2-mod-security2 and modsecurity-crs..."
     if ! sudo apt-get install -y libapache2-mod-security2 modsecurity-crs; then
-        log_warning "Failed to install required ModSecurity packages."
-        log_info "Skipping ModSecurity installation - check package repositories"
-        return 0
+        log_error "Failed to install required ModSecurity packages."
+        return 1
     fi
 
     local recommended_conf=""
@@ -208,23 +199,20 @@ install_modsecurity_manual() {
     done
 
     if [ -z "$recommended_conf" ]; then
-        log_warning "Could not locate modsecurity.conf-recommended"
-        log_info "Skipping ModSecurity configuration - copy manually to /etc/modsecurity/modsecurity.conf"
-        return 0
+        log_error "Could not locate modsecurity.conf-recommended. Please copy it manually to /etc/modsecurity/modsecurity.conf"
+        return 1
     fi
 
     log_info "Found recommended config at: $recommended_conf"
     sudo mkdir -p /etc/modsecurity
     if ! sudo cp "$recommended_conf" /etc/modsecurity/modsecurity.conf; then
-        log_warning "Failed to copy the configuration file."
-        log_info "Skipping ModSecurity configuration"
-        return 0
+        log_error "Failed to copy the configuration file."
+        return 1
     fi
 
     if ! sudo sed -i 's/^SecRuleEngine .*/SecRuleEngine On/' /etc/modsecurity/modsecurity.conf; then
-        log_warning "Failed to enable blocking mode in /etc/modsecurity/modsecurity.conf"
-        log_info "Skipping ModSecurity configuration - edit manually"
-        return 0
+        log_error "Failed to enable blocking mode in /etc/modsecurity/modsecurity.conf"
+        return 1
     fi
 
     sudo chown root:root /etc/modsecurity/modsecurity.conf
@@ -244,8 +232,8 @@ install_modsecurity_manual() {
     sudo chmod 640 "$audit_log"
 
     if ! ensure_crs_setup_profile; then
-        log_warning "CRS setup provisioning failed"
-        log_info "Continuing without CRS configuration - configure manually if needed"
+        log_error "CRS setup provisioning failed"
+        return 1
     fi
 
     if command -v a2enmod >/dev/null 2>&1; then
@@ -295,19 +283,6 @@ install_modsecurity_manual() {
 
 configure_modsecurity() {
     print_banner "Configuring ModSecurity (Block Mode) with a Single CRS Setup File"
-    
-    # Check if Apache is installed
-    if ! command -v apache2 &>/dev/null && ! command -v httpd &>/dev/null && \
-       ! command -v apache2ctl &>/dev/null && ! command -v apachectl &>/dev/null; then
-        log_info "Apache is not installed - skipping ModSecurity configuration"
-        return 0
-    fi
-    
-    # Check if ModSecurity module exists
-    if [ ! -d "/etc/modsecurity" ] && [ ! -d "/etc/apache2/mods-available" ] && [ ! -d "/etc/httpd/conf.d" ]; then
-        log_info "ModSecurity does not appear to be installed - skipping configuration"
-        return 0
-    fi
 
     sudo mkdir -p /etc/modsecurity
 
@@ -326,22 +301,19 @@ configure_modsecurity() {
     done
 
     if [ -z "$recommended_conf" ]; then
-        log_warning "modsecurity.conf-recommended not found"
-        log_info "Install ModSecurity packages before configuring - skipping"
-        return 0
+        log_error "modsecurity.conf-recommended not found. Install ModSecurity packages first."
+        return 1
     fi
 
     log_info "Using recommended ModSecurity config from $recommended_conf"
     sudo cp "$recommended_conf" "$main_conf"
     if ! sudo sed -Ei 's/^\s*SecRuleEngine\s+.*/SecRuleEngine On/I' "$main_conf"; then
-        log_warning "Failed to enable blocking mode in $main_conf"
-        log_info "Skipping ModSecurity configuration - edit manually"
-        return 0
+        log_error "Failed to enable blocking mode in $main_conf"
+        return 1
     fi
     if ! sudo grep -qE '^\s*SecRuleEngine\s+On' "$main_conf"; then
-        log_warning "SecRuleEngine On not detected in $main_conf after update"
-        log_info "Skipping ModSecurity configuration - edit manually"
-        return 0
+        log_error "SecRuleEngine On not detected in $main_conf after update"
+        return 1
     fi
     log_success "SecRuleEngine enforced in $main_conf"
 

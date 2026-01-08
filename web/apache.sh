@@ -4,13 +4,6 @@
 
 function configure_apache_htaccess {
     print_banner "Configuring Apache Global Security Policy"
-    
-    # Check if Apache is installed at all - skip silently if not
-    if ! command -v apache2 &>/dev/null && ! command -v httpd &>/dev/null && \
-       ! command -v apache2ctl &>/dev/null && ! command -v apachectl &>/dev/null; then
-        log_info "Apache is not installed - skipping Apache hardening"
-        return 0
-    fi
 
     local webroot=""
     if [ -d "/var/www/html/web" ]; then
@@ -20,9 +13,8 @@ function configure_apache_htaccess {
     elif [ -d "/var/www" ]; then
         webroot="/var/www"
     else
-        log_warning "No Apache web root found."
-        log_info "Skipping Apache configuration - Apache web root not detected."
-        return 0
+        log_error "No Apache web root found."
+        return 1
     fi
 
     local conf_dir="" conf_file="" apachectl="" service_name=""
@@ -37,9 +29,8 @@ function configure_apache_htaccess {
         apachectl="apachectl"
         service_name="httpd"
     else
-        log_warning "Apache configuration directory not found (expected /etc/apache2 or /etc/httpd)."
-        log_info "Skipping Apache hardening - Apache does not appear to be installed."
-        return 0
+        log_error "Apache configuration directory not found (expected /etc/apache2 or /etc/httpd)."
+        return 1
     fi
 
     sudo mkdir -p "$conf_dir"
@@ -153,30 +144,22 @@ EOT
 
 function install_apache_user_agent_blocker {
     print_banner "Installing Apache User-Agent Blocker"
-    
-    # Check if Apache is installed
-    if ! command -v apache2 &>/dev/null && ! command -v httpd &>/dev/null && \
-       ! command -v apache2ctl &>/dev/null && ! command -v apachectl &>/dev/null; then
-        log_info "Apache is not installed - skipping User-Agent blocker installation"
-        return 0
-    fi
 
     local script_path
     script_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/install-apache-ua-block.sh"
 
     if [ ! -f "$script_path" ]; then
-        log_warning "UA blocker installer script not found at $script_path"
-        log_info "Skipping User-Agent blocker installation"
-        return 0
+        log_error "Installer script not found at $script_path"
+        return 1
     fi
 
     if [ ! -x "$script_path" ]; then
-        chmod +x "$script_path" 2>/dev/null || true
+        chmod +x "$script_path"
     fi
 
     if [ "$EUID" -ne 0 ]; then
-        sudo "$script_path" || log_warning "User-Agent blocker installation encountered issues"
+        sudo "$script_path"
     else
-        "$script_path" || log_warning "User-Agent blocker installation encountered issues"
+        "$script_path"
     fi
 }

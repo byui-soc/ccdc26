@@ -1,5 +1,16 @@
-# Before Using
+1. Clone the repo
 
-I have tested these scripts on a few machines, but if services ex. 'ssh, apache, mysql' are not installed, the hardening for these services of course will not work and the script crashes.
+2\. Run sudo ./ccdc.sh from the root directory
 
-Run 'ccdc.sh' as root.
+3\. Choose from the menu:
+
+
+
+&nbsp;     Comprehensive - Runs everything automatically
+
+&nbsp;     Core Menu - Pick specific hardening tasks
+
+&nbsp;     Web Menu - Web application hardening
+
+&nbsp;     Continuous Menu - Security scanning
+

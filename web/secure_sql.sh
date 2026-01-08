@@ -82,12 +82,6 @@ function _mysql_connection_ok {
 }
 
 function backup_databases {
-    # Check if MySQL/MariaDB tools are available
-    if ! command -v mysqldump &>/dev/null && ! command -v mysql &>/dev/null; then
-        log_info "MySQL/MariaDB tools not found - skipping database backup"
-        return 0
-    fi
-    
     if [ "$ANSIBLE" == "true" ]; then
         log_warning "Ansible mode: Skipping interactive database backups."
         return 0
@@ -305,12 +299,6 @@ function _verify_mysql_application_login {
 }
 function secure_mysql {
     print_banner "MySQL/MariaDB Hardening"
-    
-    # Check if MySQL/MariaDB is installed at all - skip silently if not
-    if ! command -v mysql &>/dev/null && ! command -v mariadb &>/dev/null; then
-        log_info "MySQL/MariaDB is not installed - skipping database hardening"
-        return 0
-    fi
 
     if [ "$ANSIBLE" == "true" ]; then
         log_warning "mysql_secure_installation cannot run non-interactively in this context."
@@ -470,12 +458,6 @@ function _prompt_web_directories {
 }
 function rotate_db_passwords {
     print_banner "Database Credential Rotation"
-    
-    # Check if MySQL/MariaDB is available
-    if ! command -v mysql &>/dev/null; then
-        log_info "MySQL/MariaDB client not found - skipping database password rotation"
-        return 0
-    fi
 
     if [ "$ANSIBLE" == "true" ]; then
         log_warning "Database rotation prompts are not supported in non-interactive Ansible mode."

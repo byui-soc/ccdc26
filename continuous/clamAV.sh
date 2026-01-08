@@ -42,8 +42,7 @@ function _clamav_install_packages {
     elif command -v zypper >/dev/null 2>&1; then
         sudo zypper install -y clamav
     else
-        log_warning "Unsupported package manager for ClamAV installation."
-        log_info "Install ClamAV manually: apt-get install clamav or yum install clamav"
+        log_error "Unsupported package manager for ClamAV installation."
         return 1
     fi
 }
@@ -139,9 +138,8 @@ function run_clamav_scan {
     local scan_cmd
     scan_cmd=$(_clamav_select_command)
     if [ -z "$scan_cmd" ]; then
-        log_warning "ClamAV scan command not found after installation attempt."
-        log_info "Skipping ClamAV scan - install clamscan or clamdscan manually"
-        return 0
+        log_error "ClamAV scan command not found after installation attempt."
+        return 1
     fi
 
     _clamav_update_definitions

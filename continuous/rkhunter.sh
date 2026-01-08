@@ -25,9 +25,8 @@ function run_rkhunter {
     elif command -v zypper >/dev/null 2>&1; then
         sudo zypper install -y rkhunter
     else
-        log_warning "Could not determine package manager to install rkhunter."
-        log_info "Skipping rkhunter scan - install manually if needed."
-        return 0
+        log_error "Could not determine package manager to install rkhunter."
+        return 1
     fi
 
     log_info "Running rkhunter scan. Please review the output for warnings."
