@@ -1,0 +1,251 @@
+<dashboard version="1.1" theme="dark">
+  <label>CCDC Windows Security</label>
+  <description>Windows Event Log monitoring and analysis</description>
+
+  <fieldset submitButton="false">
+    <input type="time" token="time_range">
+      <label>Time Range</label>
+      <default>
+        <earliest>-4h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="host_filter">
+      <label>Host</label>
+      <choice value="*">All Hosts</choice>
+      <default>*</default>
+      <search>
+        <query>index=* sourcetype="WinEventLog:*" | stats count by host | fields host</query>
+      </search>
+      <fieldForLabel>host</fieldForLabel>
+      <fieldForValue>host</fieldForValue>
+    </input>
+  </fieldset>
+
+  <row>
+    <panel>
+      <title>Failed Logons</title>
+      <single>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:Security" EventCode=4625 | stats count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[10,50]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Successful Logons</title>
+      <single>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:Security" EventCode=4624 | stats count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>New Processes</title>
+      <single>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:Security" EventCode=4688 | stats count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Account Changes</title>
+      <single>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:Security" (EventCode=4720 OR EventCode=4722 OR EventCode=4724 OR EventCode=4728 OR EventCode=4732 OR EventCode=4756) | stats count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[1,5]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Security Events Timeline</title>
+      <chart>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:Security" | eval EventType=case(EventCode=4624,"Logon",EventCode=4625,"FailedLogon",EventCode=4688,"ProcessCreate",EventCode=4720 OR EventCode=4722 OR EventCode=4724 OR EventCode=4728 OR EventCode=4732,"AccountChange",1=1,"Other") | timechart span=5m count by EventType</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Critical Security Events</title>
+      <table>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:Security" (EventCode=4720 OR EventCode=4722 OR EventCode=4724 OR EventCode=4725 OR EventCode=4726 OR EventCode=4728 OR EventCode=4732 OR EventCode=4756 OR EventCode=4740 OR EventCode=1102 OR EventCode=4719) | eval Description=case(EventCode=4720,"User Created",EventCode=4722,"User Enabled",EventCode=4724,"Password Reset",EventCode=4725,"User Disabled",EventCode=4726,"User Deleted",EventCode=4728,"Added to Global Group",EventCode=4732,"Added to Local Group",EventCode=4756,"Added to Universal Group",EventCode=4740,"Account Locked",EventCode=1102,"Audit Log Cleared",EventCode=4719,"Audit Policy Changed",1=1,"Other") | table _time, host, EventCode, Description, TargetUserName, SubjectUserName | sort -_time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="count">20</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Logon by Type</title>
+      <chart>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:Security" EventCode=4624 | eval LogonTypeName=case(LogonType=2,"Interactive",LogonType=3,"Network",LogonType=4,"Batch",LogonType=5,"Service",LogonType=7,"Unlock",LogonType=8,"NetworkCleartext",LogonType=9,"NewCredentials",LogonType=10,"RemoteInteractive",LogonType=11,"CachedInteractive",1=1,"Unknown") | stats count by LogonTypeName | sort -count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="charting.chart">pie</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Failed Logon by Reason</title>
+      <table>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:Security" EventCode=4625 | eval FailReason=case(SubStatus="0xc0000064","User not found",SubStatus="0xc000006a","Bad password",SubStatus="0xc0000234","Account locked",SubStatus="0xc0000072","Account disabled",SubStatus="0xc000006f","Outside hours",SubStatus="0xc0000070","Workstation restriction",SubStatus="0xc0000071","Password expired",SubStatus="0xc0000193","Account expired",1=1,SubStatus) | stats count by FailReason | sort -count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>PowerShell Activity</title>
+      <table>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:PowerShell:Operational" | rex field=ScriptBlockText "(?&lt;script_preview&gt;.{0,200})" | table _time, host, script_preview | sort -_time | head 20</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">row</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Suspicious PowerShell</title>
+      <table>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:PowerShell:Operational" (ScriptBlockText="*Invoke-Expression*" OR ScriptBlockText="*IEX*" OR ScriptBlockText="*downloadstring*" OR ScriptBlockText="*EncodedCommand*" OR ScriptBlockText="*-enc *" OR ScriptBlockText="*FromBase64String*" OR ScriptBlockText="*Net.WebClient*" OR ScriptBlockText="*Invoke-WebRequest*") | table _time, host, ScriptBlockText | sort -_time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="wrap">true</option>
+        <option name="count">15</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>New Services Installed</title>
+      <table>
+        <search>
+          <query>index=wineventlog host=$host_filter$ sourcetype="WinEventLog:System" EventCode=7045 | table _time, host, ServiceName, ServiceFileName, ServiceType | sort -_time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Scheduled Tasks Created</title>
+      <table>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:TaskScheduler" EventCode=106 | table _time, host, TaskName, UserContext | sort -_time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Sysmon Process Creation (if available)</title>
+      <table>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:Sysmon" EventCode=1 | table _time, host, User, Image, CommandLine, ParentImage | sort -_time | head 30</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Windows Defender Alerts</title>
+      <table>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:Defender" | table _time, host, Threat_Name, Severity, Action | sort -_time | head 20</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>RDP Sessions</title>
+      <table>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:*" (EventCode=4624 LogonType=10) OR (sourcetype="WinEventLog:RDP") | table _time, host, TargetUserName, IpAddress, EventCode | sort -_time | head 20</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+</dashboard>

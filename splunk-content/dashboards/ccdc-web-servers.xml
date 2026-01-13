@@ -1,0 +1,245 @@
+<dashboard version="1.1" theme="dark">
+  <label>CCDC Web Server Monitor</label>
+  <description>Apache, Nginx, and IIS monitoring</description>
+
+  <fieldset submitButton="false">
+    <input type="time" token="time_range">
+      <label>Time Range</label>
+      <default>
+        <earliest>-4h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="host_filter">
+      <label>Host</label>
+      <choice value="*">All Hosts</choice>
+      <default>*</default>
+      <search>
+        <query>index=web | stats count by host | fields host</query>
+      </search>
+      <fieldForLabel>host</fieldForLabel>
+      <fieldForValue>host</fieldForValue>
+    </input>
+  </fieldset>
+
+  <row>
+    <panel>
+      <title>Total Requests</title>
+      <single>
+        <search>
+          <query>index=web host=$host_filter$ | stats count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Error Responses (4xx/5xx)</title>
+      <single>
+        <search>
+          <query>index=web host=$host_filter$ (status>=400 OR sc_status>=400) | stats count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[50,200]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Unique Client IPs</title>
+      <single>
+        <search>
+          <query>index=web host=$host_filter$ | stats dc(clientip) as unique_ips</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Attack Indicators</title>
+      <single>
+        <search>
+          <query>index=web host=$host_filter$ (uri="*cmd*" OR uri="*shell*" OR uri="*UNION*" OR uri="*..*" OR uri="*eval*" OR uri="*base64*") | stats count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[1,10]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Requests Over Time</title>
+      <chart>
+        <search>
+          <query>index=web host=$host_filter$ | timechart span=5m count by host</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Response Codes</title>
+      <chart>
+        <search>
+          <query>index=web host=$host_filter$ | rex field=_raw "\" (?&lt;status&gt;\d{3}) " | stats count by status | sort status</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="charting.chart">pie</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>HTTP Methods</title>
+      <chart>
+        <search>
+          <query>index=web host=$host_filter$ | rex field=_raw "\"(?&lt;method&gt;GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH)" | stats count by method</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="charting.chart">pie</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Top Client IPs</title>
+      <table>
+        <search>
+          <query>index=web host=$host_filter$ | rex field=_raw "^(?&lt;clientip&gt;[\d\.]+)" | stats count as Requests by clientip | sort -Requests | head 15</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">cell</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Top Requested URIs</title>
+      <table>
+        <search>
+          <query>index=web host=$host_filter$ | rex field=_raw "\"(?:GET|POST|PUT|DELETE|HEAD)\s+(?&lt;uri&gt;[^\s\"]+)" | stats count as Requests by uri | sort -Requests | head 15</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">cell</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Potential Web Shell Access</title>
+      <table>
+        <search>
+          <query>index=web host=$host_filter$ (uri="*cmd*" OR uri="*shell*" OR uri="*c99*" OR uri="*r57*" OR uri="*b374k*" OR uri="*wso*" OR uri="*phpinfo*" OR uri="*eval(*" OR uri="*system(*" OR uri="*passthru*" OR uri="*exec(*") | table _time, host, clientip, uri, status | sort -_time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="wrap">true</option>
+        <option name="count">20</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>SQL Injection Attempts</title>
+      <table>
+        <search>
+          <query>index=web host=$host_filter$ (uri="*UNION*" OR uri="*SELECT*" OR uri="*OR%201=1*" OR uri="*'%20OR%20'*" OR uri="*;DROP*" OR uri="*--*" OR uri="*/*") | table _time, host, clientip, uri | sort -_time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="wrap">true</option>
+        <option name="count">20</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Directory Traversal Attempts</title>
+      <table>
+        <search>
+          <query>index=web host=$host_filter$ (uri="*..*" OR uri="*%2e%2e*" OR uri="*%252e*") | table _time, host, clientip, uri | sort -_time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="wrap">true</option>
+        <option name="count">20</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>4xx Client Errors</title>
+      <table>
+        <search>
+          <query>index=web host=$host_filter$ | rex field=_raw "\" (?&lt;status&gt;4\d{2}) " | where status>=400 AND status&lt;500 | stats count by uri, status | sort -count | head 20</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <title>5xx Server Errors</title>
+      <table>
+        <search>
+          <query>index=web host=$host_filter$ | rex field=_raw "\" (?&lt;status&gt;5\d{2}) " | where status>=500 | table _time, host, uri, status | sort -_time | head 20</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Web Server Error Logs</title>
+      <table>
+        <search>
+          <query>index=web host=$host_filter$ sourcetype=*error* | table _time, host, _raw | sort -_time | head 30</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</dashboard>

@@ -1,0 +1,201 @@
+<dashboard version="1.1" theme="dark">
+  <label>CCDC Authentication Monitor</label>
+  <description>Monitor authentication events across all systems</description>
+
+  <fieldset submitButton="false">
+    <input type="time" token="time_range">
+      <label>Time Range</label>
+      <default>
+        <earliest>-4h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="host_filter">
+      <label>Host</label>
+      <choice value="*">All Hosts</choice>
+      <default>*</default>
+      <search>
+        <query>index=security | stats count by host | fields host</query>
+      </search>
+      <fieldForLabel>host</fieldForLabel>
+      <fieldForValue>host</fieldForValue>
+    </input>
+  </fieldset>
+
+  <row>
+    <panel>
+      <title>Failed Logins</title>
+      <single>
+        <search>
+          <query>index=security host=$host_filter$ ("Failed password" OR "authentication failure" OR EventCode=4625) | stats count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[10,50]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Successful Logins</title>
+      <single>
+        <search>
+          <query>index=security host=$host_filter$ ("Accepted password" OR "Accepted publickey" OR "session opened" OR EventCode=4624) | stats count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Unique Source IPs</title>
+      <single>
+        <search>
+          <query>index=security host=$host_filter$ | rex field=_raw "from (?&lt;src_ip&gt;\d+\.\d+\.\d+\.\d+)" | stats dc(src_ip)</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Unique Users</title>
+      <single>
+        <search>
+          <query>index=security host=$host_filter$ | rex field=_raw "for (?:invalid user )?(?&lt;user&gt;\w+)" | stats dc(user)</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Authentication Timeline</title>
+      <chart>
+        <search>
+          <query>index=security host=$host_filter$ ("Failed password" OR "Accepted password" OR "authentication failure" OR EventCode=4624 OR EventCode=4625) | eval status=if(match(_raw,"Failed|failure|4625"),"Failed","Success") | timechart span=5m count by status</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="charting.fieldColors">{"Failed":"#dc4e41","Success":"#53a051"}</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Failed Login Sources (IP Map)</title>
+      <table>
+        <search>
+          <query>index=security host=$host_filter$ ("Failed password" OR "authentication failure" OR EventCode=4625) | rex field=_raw "from (?&lt;src_ip&gt;\d+\.\d+\.\d+\.\d+)" | stats count as Attempts, dc(host) as "Hosts Targeted", values(host) as Hosts by src_ip | sort -Attempts | head 20</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="drilldown">cell</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Targeted Usernames</title>
+      <table>
+        <search>
+          <query>index=security host=$host_filter$ ("Failed password" OR "authentication failure" OR EventCode=4625) | rex field=_raw "for (?:invalid user )?(?&lt;user&gt;\w+)" | stats count as Attempts by user | sort -Attempts | head 20</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="drilldown">cell</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Successful Logins - Detail</title>
+      <table>
+        <search>
+          <query>index=security host=$host_filter$ ("Accepted password" OR "Accepted publickey" OR (EventCode=4624 LogonType!=5)) | rex field=_raw "for (?&lt;user&gt;\w+) from (?&lt;src_ip&gt;[\d\.]+)" | table _time, host, user, src_ip, sourcetype | sort -_time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="count">20</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Sudo Commands</title>
+      <table>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype=linux_secure "sudo:" COMMAND | rex field=_raw "(?&lt;user&gt;\w+)\s+:\s+.*COMMAND=(?&lt;command&gt;.*)" | table _time, host, user, command | sort -_time | head 30</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Windows Logon Events by Type</title>
+      <chart>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:Security" EventCode=4624 | eval LogonTypeName=case(LogonType=2,"Interactive",LogonType=3,"Network",LogonType=4,"Batch",LogonType=5,"Service",LogonType=7,"Unlock",LogonType=8,"NetworkCleartext",LogonType=9,"NewCredentials",LogonType=10,"RemoteInteractive",LogonType=11,"CachedInteractive",1=1,"Unknown") | stats count by LogonTypeName</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="charting.chart">pie</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Windows Failed Logon Reasons</title>
+      <table>
+        <search>
+          <query>index=security host=$host_filter$ sourcetype="WinEventLog:Security" EventCode=4625 | stats count by Status, SubStatus | sort -count | head 10</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Raw Authentication Events</title>
+      <event>
+        <search>
+          <query>index=security host=$host_filter$ ("Failed" OR "Accepted" OR "authentication" OR EventCode=4624 OR EventCode=4625)</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="count">20</option>
+        <option name="list.drilldown">full</option>
+      </event>
+    </panel>
+  </row>
+</dashboard>

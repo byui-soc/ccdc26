@@ -1,0 +1,207 @@
+<dashboard version="1.1" theme="dark">
+  <label>CCDC Security Overview</label>
+  <description>Real-time security monitoring dashboard for CCDC competition</description>
+
+  <row>
+    <panel>
+      <title>Active Alerts (Last Hour)</title>
+      <single>
+        <search>
+          <query>index=* (sourcetype=ccdc_findings OR "CRITICAL" OR "ALERT" OR "Failed password" OR EventCode=4625) earliest=-1h | stats count</query>
+          <earliest>-1h</earliest>
+          <latest>now</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[5,20]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Failed Logins (Last Hour)</title>
+      <single>
+        <search>
+          <query>index=security ("Failed password" OR "authentication failure" OR EventCode=4625) earliest=-1h | stats count</query>
+          <earliest>-1h</earliest>
+          <latest>now</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[10,50]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Successful Logins (Last Hour)</title>
+      <single>
+        <search>
+          <query>index=security ("Accepted password" OR "Accepted publickey" OR "session opened" OR EventCode=4624) earliest=-1h | stats count</query>
+          <earliest>-1h</earliest>
+          <latest>now</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[0,100]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Hosts Reporting</title>
+      <single>
+        <search>
+          <query>index=* earliest=-15m | stats dc(host)</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Security Events Over Time</title>
+      <chart>
+        <search>
+          <query>index=security earliest=-4h | timechart span=5m count by sourcetype</query>
+          <earliest>-4h</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Top Source IPs (Failed Auth)</title>
+      <table>
+        <search>
+          <query>index=security ("Failed password" OR "authentication failure" OR EventCode=4625) earliest=-1h | rex field=_raw "from (?&lt;src_ip&gt;\d+\.\d+\.\d+\.\d+)" | stats count as "Failures" by src_ip | sort -count | head 10</query>
+          <earliest>-1h</earliest>
+          <latest>now</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Top Targeted Users</title>
+      <table>
+        <search>
+          <query>index=security ("Failed password" OR "authentication failure" OR EventCode=4625) earliest=-1h | rex field=_raw "for (?:invalid user )?(?&lt;target_user&gt;\w+)" | stats count as "Attempts" by target_user | sort -count | head 10</query>
+          <earliest>-1h</earliest>
+          <latest>now</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Recent Successful Logins</title>
+      <table>
+        <search>
+          <query>index=security ("Accepted password" OR "Accepted publickey" OR EventCode=4624) earliest=-1h | table _time, host, user, src_ip | head 15</query>
+          <earliest>-1h</earliest>
+          <latest>now</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Critical Events - User/Account Changes</title>
+      <table>
+        <search>
+          <query>index=security (("useradd" OR "adduser" OR "usermod" OR "passwd") OR (EventCode=4720 OR EventCode=4722 OR EventCode=4724 OR EventCode=4732)) earliest=-4h | table _time, host, _raw | head 20</query>
+          <earliest>-4h</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Persistence Indicators</title>
+      <table>
+        <search>
+          <query>index=security sourcetype=linux_audit (key=cron OR key=systemd OR key=sshd_config OR key=sudoers_changes) earliest=-4h | table _time, host, key, exe, path | head 20</query>
+          <earliest>-4h</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Windows Persistence</title>
+      <table>
+        <search>
+          <query>index=security sourcetype="WinEventLog:*" (EventCode=7045 OR EventCode=106 OR EventCode=4698) earliest=-4h | table _time, host, EventCode, Message | head 20</query>
+          <earliest>-4h</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>CCDC Toolkit Findings</title>
+      <table>
+        <search>
+          <query>index=ccdc sourcetype=ccdc_findings earliest=-4h | table _time, host, _raw | head 20</query>
+          <earliest>-4h</earliest>
+          <latest>now</latest>
+          <refresh>30s</refresh>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Events by Host</title>
+      <chart>
+        <search>
+          <query>index=* earliest=-1h | stats count by host | sort -count</query>
+          <earliest>-1h</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="charting.chart">pie</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Events by Index</title>
+      <chart>
+        <search>
+          <query>index=* earliest=-1h | stats count by index | sort -count</query>
+          <earliest>-1h</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+        </search>
+        <option name="charting.chart">pie</option>
+      </chart>
+    </panel>
+  </row>
+</dashboard>

@@ -18,6 +18,9 @@ sudo ./services/harden-all.sh
 sudo ./tools/fail2ban-setup.sh
 sudo ./tools/security-tools.sh
 
+# Set up Splunk log forwarding (edit SPLUNK_SERVER first!)
+sudo ./tools/splunk-forwarder.sh
+
 # Start monitoring
 sudo ./monitoring/deploy-monitoring.sh
 
@@ -46,7 +49,8 @@ ccdc-toolkit/
 │   └── harden-dns.sh       # BIND/named
 ├── tools/                  # Security tools setup
 │   ├── fail2ban-setup.sh   # Fail2ban installation & config
-│   └── security-tools.sh   # Auditd, rkhunter, lynis, etc.
+│   ├── security-tools.sh   # Auditd, rkhunter, lynis, etc.
+│   └── splunk-forwarder.sh # Splunk Universal Forwarder setup
 ├── persistence-hunting/    # Find attacker persistence
 │   ├── full-hunt.sh        # Run all persistence checks
 │   ├── cron-audit.sh       # Cron job analysis
@@ -82,8 +86,9 @@ ccdc-toolkit/
 ### Next 30 Minutes (Important)
 4. `./services/harden-all.sh` - Harden all detected services
 5. `./tools/fail2ban-setup.sh` - Set up intrusion prevention
-6. `./persistence-hunting/full-hunt.sh` - Find backdoors
-7. `./monitoring/deploy-monitoring.sh` - Start monitoring
+6. `./tools/splunk-forwarder.sh` - Set up centralized logging to Splunk
+7. `./persistence-hunting/full-hunt.sh` - Find backdoors
+8. `./monitoring/deploy-monitoring.sh` - Start monitoring
 
 ### Ongoing
 - Monitor alerts from `./monitoring/`
@@ -109,6 +114,44 @@ Run `./services/harden-all.sh` to auto-detect and secure all services.
 - **chkrootkit**: Rootkit detection
 - **lynis**: Security auditing
 - **ClamAV**: Antivirus scanning
+- **Splunk Universal Forwarder**: Centralized log forwarding
+
+## Splunk Log Forwarding
+
+The toolkit includes a Splunk Universal Forwarder setup script that forwards ALL logs to a central Splunk server.
+
+### Setup
+
+1. Edit `tools/splunk-forwarder.sh` and set `SPLUNK_SERVER` to your Splunk indexer IP
+2. Run the script: `sudo ./tools/splunk-forwarder.sh`
+3. Select option 1 for quick setup
+
+### Logs Forwarded
+
+The forwarder collects logs from all sources:
+- **Security**: auth.log, secure, audit.log, fail2ban
+- **System**: syslog, messages, kern.log, cron
+- **Web**: Apache access/error, Nginx access/error
+- **Database**: MySQL, MariaDB, PostgreSQL
+- **Mail**: mail.log, maillog
+- **DNS**: BIND/named query and security logs
+- **FTP**: vsftpd, ProFTPD logs
+- **CCDC Toolkit**: All toolkit monitoring output
+- **Containers**: Docker JSON logs
+
+### Splunk Indexes Required
+
+Create these indexes on your Splunk server:
+- `main` - Default index
+- `security` - Authentication, audit, intrusion prevention logs
+- `os` - System and kernel logs
+- `web` - Web server logs
+- `database` - Database logs
+- `mail` - Mail server logs
+- `dns` - DNS server logs
+- `ftp` - FTP server logs
+- `ccdc` - CCDC toolkit logs
+- `containers` - Docker/container logs
 
 ## Distro Detection
 
