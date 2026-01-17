@@ -93,7 +93,7 @@ ccdc-toolkit/
 
 ### Ongoing
 - Monitor alerts from `./monitoring/`
-- Setup ./incident-response/incident_responder.sh to monitor network traffic and automatically shut down new sessions (will trigger if you login with a new user) 
+- Setup `./incident-response/incident_responder.sh to monitor network traffic and automatically shut down new sessions (will trigger if you login with a new user) `
 - Re-run persistence hunting periodically
 - Use IR tools as needed
 
