@@ -69,6 +69,7 @@ ccdc-toolkit/
 │   ├── collect-evidence.sh # Evidence collection
 │   ├── kill-session.sh     # Kill attacker sessions
 │   ├── isolate.sh          # Network isolation
+│   ├── incident_responder.sh # Automatic Incident Responder (blocks attackers)
 │   └── restore-service.sh  # Service recovery
 ├── utils/                  # Utility functions
 │   └── common.sh           # Shared functions
@@ -92,6 +93,7 @@ ccdc-toolkit/
 
 ### Ongoing
 - Monitor alerts from `./monitoring/`
+- Setup ./incident-response/incident_responder.sh to monitor network traffic and automatically shut down new sessions (will trigger if you login with a new user) 
 - Re-run persistence hunting periodically
 - Use IR tools as needed
 
