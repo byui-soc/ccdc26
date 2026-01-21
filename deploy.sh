@@ -112,7 +112,7 @@ local_menu() {
             fi
             header "Running Quick Harden"
             cd "$SCRIPT_DIR/linux-scripts"
-            ./hardening/full-harden.sh <<< "y"
+            bash ./hardening/full-harden.sh <<< "y"
             ;;
         2)
             if [ "$IS_ROOT" != true ]; then
@@ -131,12 +131,12 @@ local_menu() {
             echo ""
             read -p "Select script [1-6]: " script_choice
             case $script_choice in
-                1) ./users.sh ;;
-                2) ./ssh.sh ;;
-                3) ./firewall.sh ;;
-                4) ./services.sh ;;
-                5) ./permissions.sh ;;
-                6) ./kernel.sh ;;
+                1) bash ./users.sh ;;
+                2) bash ./ssh.sh ;;
+                3) bash ./firewall.sh ;;
+                4) bash ./services.sh ;;
+                5) bash ./permissions.sh ;;
+                6) bash ./kernel.sh ;;
                 *) error "Invalid option" ;;
             esac
             ;;
@@ -147,7 +147,7 @@ local_menu() {
             fi
             header "Running Service Hardening"
             cd "$SCRIPT_DIR/linux-scripts/services"
-            ./harden-all.sh
+            bash ./harden-all.sh
             ;;
         4)
             if [ "$IS_ROOT" != true ]; then
@@ -160,7 +160,7 @@ local_menu() {
                 sed -i "s/WAZUH_MANAGER=.*/WAZUH_MANAGER=\"$wazuh_ip\"/" "$SCRIPT_DIR/linux-scripts/tools/wazuh-agent.sh"
             fi
             cd "$SCRIPT_DIR/linux-scripts/tools"
-            ./wazuh-agent.sh
+            bash ./wazuh-agent.sh
             ;;
         5)
             if [ "$IS_ROOT" != true ]; then
@@ -170,7 +170,7 @@ local_menu() {
             header "Deploying Splunk Forwarder (Backup SIEM)"
             info "Forwarding to competition Splunk server: 172.20.242.20:9997"
             cd "$SCRIPT_DIR/linux-scripts/tools"
-            ./splunk-forwarder.sh
+            bash ./splunk-forwarder.sh
             ;;
         6)
             if [ "$IS_ROOT" != true ]; then
@@ -179,7 +179,7 @@ local_menu() {
             fi
             header "Hunting for Persistence"
             cd "$SCRIPT_DIR/linux-scripts/persistence-hunting"
-            ./full-hunt.sh
+            bash ./full-hunt.sh
             ;;
         7)
             if [ "$IS_ROOT" != true ]; then
@@ -188,7 +188,7 @@ local_menu() {
             fi
             header "Starting Monitoring"
             cd "$SCRIPT_DIR/linux-scripts/monitoring"
-            ./deploy-monitoring.sh
+            bash ./deploy-monitoring.sh
             ;;
         8)
             if [ "$IS_ROOT" != true ]; then
@@ -202,7 +202,7 @@ local_menu() {
             echo ""
             read -p "Enter script name (or 'back'): " ir_script
             if [ "$ir_script" != "back" ] && [ -f "$ir_script" ]; then
-                ./"$ir_script"
+                bash "./$ir_script"
             fi
             ;;
         9)
@@ -212,7 +212,7 @@ local_menu() {
             fi
             header "Deploying Wazuh Server"
             cd "$SCRIPT_DIR/linux-scripts/tools"
-            ./wazuh-server.sh
+            bash ./wazuh-server.sh
             ;;
         0)
             return
@@ -392,7 +392,7 @@ case "${1:-}" in
         fi
         header "Quick Harden Mode"
         cd "$SCRIPT_DIR/linux-scripts"
-        ./hardening/full-harden.sh <<< "y"
+        bash ./hardening/full-harden.sh <<< "y"
         exit 0
         ;;
     --ansible|-a)
