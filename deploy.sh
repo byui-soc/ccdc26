@@ -41,8 +41,17 @@ detect_environment() {
     IS_ANSIBLE_CONTROLLER=false
     IS_TARGET_SYSTEM=true
     
-    # Check for Ansible
+    # Check for Ansible (may be in user's ~/.local/bin from pip install)
     if command -v ansible &>/dev/null; then
+        IS_ANSIBLE_CONTROLLER=true
+    elif [ -f "$HOME/.local/bin/ansible" ]; then
+        IS_ANSIBLE_CONTROLLER=true
+        export PATH="$HOME/.local/bin:$PATH"
+    elif [ -f "/home/$SUDO_USER/.local/bin/ansible" ] 2>/dev/null; then
+        # Running as sudo, check the original user's pip install location
+        IS_ANSIBLE_CONTROLLER=true
+        export PATH="/home/$SUDO_USER/.local/bin:$PATH"
+    elif python3 -c "import ansible" &>/dev/null; then
         IS_ANSIBLE_CONTROLLER=true
     fi
     
