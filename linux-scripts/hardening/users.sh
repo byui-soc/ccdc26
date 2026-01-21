@@ -285,12 +285,12 @@ main() {
     echo ""
     echo "User Hardening Options:"
     echo "1) Audit users only (no changes)"
-    echo "2) Change all passwords"
+    echo "2) Change all passwords (interactive)"
     echo "3) Disable unauthorized users"
     echo "4) Harden sudo access"
     echo "5) Set password policy"
     echo "6) Secure root account"
-    echo "7) Run ALL (recommended for competition start)"
+    echo "7) Run ALL except passwords (audit, disable, sudo, policy)"
     echo ""
     read -p "Select option [1-7]: " choice
     
@@ -302,8 +302,8 @@ main() {
         5) set_password_policy ;;
         6) secure_root ;;
         7)
+            # NOTE: Passwords should be changed via Ansible, not here
             audit_users
-            change_all_passwords
             disable_unauthorized_users
             harden_sudo
             set_password_policy

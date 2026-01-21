@@ -93,20 +93,44 @@ show_banner() {
 }
 
 #=============================================================================
-# LOCAL HARDENING MENU
+# QUICK HARDEN (non-interactive)
 #=============================================================================
-local_menu() {
-    header "Local Hardening Options"
+quick_harden() {
+    if [ "$IS_ROOT" != true ]; then
+        error "Must be root. Run: sudo $0"
+        exit 1
+    fi
     
-    echo "1) Quick Harden (full-harden.sh with defaults)"
-    echo "2) Interactive Harden (choose options)"
-    echo "3) Service Hardening (harden-all.sh)"
-    echo "4) Deploy Wazuh Agent (primary SIEM)"
-    echo "5) Deploy Splunk Forwarder (backup SIEM)"
-    echo "6) Hunt for Persistence"
-    echo "7) Start Monitoring"
-    echo "8) Incident Response Tools"
-    echo "9) Deploy Wazuh Server (this system)"
+    header "Quick Harden - Starting"
+    info "This will harden the system with safe defaults."
+    info "Passwords are NOT changed - use Ansible for that."
+    echo ""
+    
+    cd "$SCRIPT_DIR/linux-scripts"
+    bash ./hardening/full-harden.sh
+    
+    success "Quick Harden complete!"
+}
+
+#=============================================================================
+# ADVANCED MENU (for power users)
+#=============================================================================
+advanced_menu() {
+    header "Advanced Options"
+    
+    echo "Hardening:"
+    echo "  1) Interactive Harden (choose individual scripts)"
+    echo "  2) Service Hardening (harden-all.sh)"
+    echo ""
+    echo "SIEM/Monitoring:"
+    echo "  3) Deploy Wazuh Agent"
+    echo "  4) Deploy Splunk Forwarder"
+    echo "  5) Deploy Wazuh Server (this system)"
+    echo "  6) Start Monitoring"
+    echo ""
+    echo "Security:"
+    echo "  7) Hunt for Persistence"
+    echo "  8) Incident Response Tools"
     echo ""
     echo "0) Back to main menu"
     echo ""
@@ -117,16 +141,7 @@ local_menu() {
         1)
             if [ "$IS_ROOT" != true ]; then
                 error "Must be root. Run: sudo $0"
-                exit 1
-            fi
-            header "Running Quick Harden"
-            cd "$SCRIPT_DIR/linux-scripts"
-            bash ./hardening/full-harden.sh
-            ;;
-        2)
-            if [ "$IS_ROOT" != true ]; then
-                error "Must be root. Run: sudo $0"
-                exit 1
+                return
             fi
             header "Interactive Hardening"
             cd "$SCRIPT_DIR/linux-scripts/hardening"
@@ -149,19 +164,19 @@ local_menu() {
                 *) error "Invalid option" ;;
             esac
             ;;
-        3)
+        2)
             if [ "$IS_ROOT" != true ]; then
                 error "Must be root. Run: sudo $0"
-                exit 1
+                return
             fi
             header "Running Service Hardening"
             cd "$SCRIPT_DIR/linux-scripts/services"
             bash ./harden-all.sh
             ;;
-        4)
+        3)
             if [ "$IS_ROOT" != true ]; then
                 error "Must be root. Run: sudo $0"
-                exit 1
+                return
             fi
             header "Deploying Wazuh Agent (Primary SIEM)"
             read -p "Enter Wazuh manager IP: " wazuh_ip
@@ -171,38 +186,47 @@ local_menu() {
             cd "$SCRIPT_DIR/linux-scripts/tools"
             bash ./wazuh-agent.sh
             ;;
-        5)
+        4)
             if [ "$IS_ROOT" != true ]; then
                 error "Must be root. Run: sudo $0"
-                exit 1
+                return
             fi
             header "Deploying Splunk Forwarder (Backup SIEM)"
             info "Forwarding to competition Splunk server: 172.20.242.20:9997"
             cd "$SCRIPT_DIR/linux-scripts/tools"
             bash ./splunk-forwarder.sh
             ;;
+        5)
+            if [ "$IS_ROOT" != true ]; then
+                error "Must be root. Run: sudo $0"
+                return
+            fi
+            header "Deploying Wazuh Server"
+            cd "$SCRIPT_DIR/linux-scripts/tools"
+            bash ./wazuh-server.sh
+            ;;
         6)
             if [ "$IS_ROOT" != true ]; then
                 error "Must be root. Run: sudo $0"
-                exit 1
-            fi
-            header "Hunting for Persistence"
-            cd "$SCRIPT_DIR/linux-scripts/persistence-hunting"
-            bash ./full-hunt.sh
-            ;;
-        7)
-            if [ "$IS_ROOT" != true ]; then
-                error "Must be root. Run: sudo $0"
-                exit 1
+                return
             fi
             header "Starting Monitoring"
             cd "$SCRIPT_DIR/linux-scripts/monitoring"
             bash ./deploy-monitoring.sh
             ;;
+        7)
+            if [ "$IS_ROOT" != true ]; then
+                error "Must be root. Run: sudo $0"
+                return
+            fi
+            header "Hunting for Persistence"
+            cd "$SCRIPT_DIR/linux-scripts/persistence-hunting"
+            bash ./full-hunt.sh
+            ;;
         8)
             if [ "$IS_ROOT" != true ]; then
                 error "Must be root. Run: sudo $0"
-                exit 1
+                return
             fi
             header "Incident Response Tools"
             cd "$SCRIPT_DIR/linux-scripts/incident-response"
@@ -213,15 +237,6 @@ local_menu() {
             if [ "$ir_script" != "back" ] && [ -f "$ir_script" ]; then
                 bash "./$ir_script"
             fi
-            ;;
-        9)
-            if [ "$IS_ROOT" != true ]; then
-                error "Must be root. Run: sudo $0"
-                exit 1
-            fi
-            header "Deploying Wazuh Server"
-            cd "$SCRIPT_DIR/linux-scripts/tools"
-            bash ./wazuh-server.sh
             ;;
         0)
             return
@@ -338,21 +353,19 @@ ansible_menu() {
 }
 
 #=============================================================================
-# MAIN MENU
+# MAIN MENU (Simple 3-option menu)
 #=============================================================================
 main_menu() {
     while true; do
         show_banner
         
-        echo "Main Menu:"
-        echo ""
-        echo "1) Local Hardening (this system)"
+        echo "1) Quick Harden (this machine)"
         if [ "$IS_ANSIBLE_CONTROLLER" = true ]; then
-            echo "2) Ansible Deployment (multiple systems)"
+            echo "2) Ansible Control Panel"
         else
-            echo "2) Ansible Deployment (not available - install ansible)"
+            echo "2) Ansible Control Panel (not available - pip3 install ansible pywinrm)"
         fi
-        echo "3) View Documentation"
+        echo "3) Advanced Options"
         echo ""
         echo "q) Quit"
         echo ""
@@ -361,18 +374,13 @@ main_menu() {
         
         case $choice in
             1)
-                local_menu
+                quick_harden
                 ;;
             2)
                 ansible_menu
                 ;;
             3)
-                header "Documentation"
-                if command -v less &>/dev/null; then
-                    less "$SCRIPT_DIR/README.md"
-                else
-                    cat "$SCRIPT_DIR/README.md"
-                fi
+                advanced_menu
                 ;;
             q|Q)
                 echo "Goodbye!"
@@ -395,13 +403,7 @@ main_menu() {
 case "${1:-}" in
     --quick|-q)
         detect_environment
-        if [ "$IS_ROOT" != true ]; then
-            error "Must be root. Run: sudo $0 --quick"
-            exit 1
-        fi
-        header "Quick Harden Mode"
-        cd "$SCRIPT_DIR/linux-scripts"
-        bash ./hardening/full-harden.sh
+        quick_harden
         exit 0
         ;;
     --ansible|-a)
