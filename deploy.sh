@@ -305,6 +305,28 @@ ansible_menu() {
         return
     fi
     
+    # Check for optional but recommended dependencies
+    local missing_deps=()
+    if ! command -v sshpass &>/dev/null; then
+        missing_deps+=("sshpass (required for password-based SSH)")
+    fi
+    
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        warn "Optional dependencies missing:"
+        for dep in "${missing_deps[@]}"; do
+            echo "  - $dep"
+        done
+        echo ""
+        if [ "$OS_ID" = "ubuntu" ] || [ "$OS_ID" = "debian" ]; then
+            echo "Install with: sudo apt install -y sshpass"
+        elif [ "$OS_ID" = "fedora" ] || [ "$OS_ID" = "rhel" ]; then
+            echo "Install with: sudo dnf install -y sshpass"
+        fi
+        echo ""
+        info "Continuing anyway (you may need these for some features)..."
+        echo ""
+    fi
+    
     # Setup auth on first run
     if [ -z "$ANSIBLE_AUTH_CONFIGURED" ]; then
         setup_ansible_auth
@@ -347,7 +369,48 @@ ansible_menu() {
             ;;
         2)
             header "Testing Connectivity"
-            ansible all -i "$ANSIBLE_DIR/inventory.ini" -m ping $ANSIBLE_EXTRA_ARGS
+            
+            # Check for sshpass if using prompt auth mode
+            if [ "$ANSIBLE_AUTH_MODE" = "prompt" ]; then
+                if ! command -v sshpass &>/dev/null; then
+                    error "sshpass is required for password-based authentication"
+                    echo ""
+                    echo "Install with:"
+                    if [ "$OS_ID" = "ubuntu" ] || [ "$OS_ID" = "debian" ]; then
+                        echo "  sudo apt install -y sshpass"
+                    elif [ "$OS_ID" = "fedora" ] || [ "$OS_ID" = "rhel" ]; then
+                        echo "  sudo dnf install -y sshpass"
+                    else
+                        echo "  sudo apt install -y sshpass  # Debian/Ubuntu"
+                        echo "  sudo dnf install -y sshpass  # Fedora/RHEL"
+                    fi
+                    echo ""
+                    read -p "Press Enter to continue..."
+                    return
+                fi
+            fi
+            
+            info "Testing connectivity to all hosts..."
+            info "Using auth mode: $ANSIBLE_AUTH_MODE"
+            echo ""
+            
+            # Run connectivity test
+            if ansible all -i "$ANSIBLE_DIR/inventory.ini" -m ping $ANSIBLE_EXTRA_ARGS; then
+                echo ""
+                success "All hosts reachable!"
+            else
+                echo ""
+                warn "Some hosts failed. Check inventory.ini passwords and SSH connectivity."
+                echo ""
+                echo "Common issues:"
+                echo "  - Wrong password in inventory.ini"
+                echo "  - SSH not enabled on target"
+                echo "  - Firewall blocking SSH/WinRM"
+                echo "  - Network routing issues"
+            fi
+            
+            echo ""
+            read -p "Press Enter to continue..."
             ;;
         3)
             header "Password Reset and User Creation"
