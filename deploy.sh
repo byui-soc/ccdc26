@@ -118,19 +118,22 @@ quick_harden() {
 advanced_menu() {
     header "Advanced Options"
     
+    echo -e "${YELLOW}All options affect THIS machine only.${NC}"
+    echo ""
     echo "Hardening:"
-    echo "  1) Interactive Harden (choose individual scripts)"
-    echo "  2) Service Hardening (harden-all.sh)"
+    echo "  1) Interactive Harden     - Choose individual scripts (users, ssh, firewall, etc.)"
+    echo "  2) Service Hardening      - Harden specific services (web, mail, DNS)"
     echo ""
     echo "SIEM/Monitoring:"
-    echo "  3) Deploy Wazuh Agent"
-    echo "  4) Deploy Splunk Forwarder"
-    echo "  5) Deploy Wazuh Server (this system)"
-    echo "  6) Start Monitoring"
+    echo "  3) Deploy Wazuh Agent     - Install Wazuh agent on THIS machine"
+    echo "  4) Deploy Splunk Forwarder- Install Splunk forwarder on THIS machine"
+    echo "  5) Deploy Wazuh Server    - Install Wazuh server on THIS machine (use on Ubuntu Wks)"
+    echo "  6) Start Monitoring       - Real-time file/process/network monitoring"
     echo ""
     echo "Security:"
-    echo "  7) Hunt for Persistence"
-    echo "  8) Incident Response Tools"
+    echo "  7) Hunt for Persistence   - Scan for backdoors, cron jobs, startup scripts"
+    echo "  8) Incident Response      - Evidence collection, session killing, isolation"
+    echo "  9) User Enumeration       - List users, permissions, sudo access, SSH keys"
     echo ""
     echo "0) Back to main menu"
     echo ""
@@ -238,6 +241,15 @@ advanced_menu() {
                 bash "./$ir_script"
             fi
             ;;
+        9)
+            if [ "$IS_ROOT" != true ]; then
+                error "Must be root. Run: sudo $0"
+                return
+            fi
+            header "User Enumeration"
+            cd "$SCRIPT_DIR/linux-scripts/persistence-hunting"
+            bash ./user-audit.sh
+            ;;
         0)
             return
             ;;
@@ -257,15 +269,18 @@ ansible_menu() {
         return
     fi
     
-    header "Ansible Deployment Options"
+    header "Ansible Control Panel"
     
-    echo "1) Generate inventory from CSV"
-    echo "2) Test connectivity (ping all hosts)"
-    echo "3) Password Reset + Create Users (changepw_kick.yml)"
-    echo "4) Deploy Hardening Scripts"
-    echo "5) Deploy Wazuh Agents (primary SIEM)"
-    echo "6) Deploy Splunk Forwarders (backup SIEM)"
-    echo "7) Gather Facts from All Hosts"
+    echo -e "${YELLOW}These commands run on OTHER machines listed in ansible/inventory.ini${NC}"
+    echo -e "${YELLOW}This machine is the controller - it sends commands via SSH/WinRM.${NC}"
+    echo ""
+    echo "1) Generate inventory from CSV     - Convert CSV to inventory.ini"
+    echo "2) Test connectivity               - Verify Ansible can reach all machines (run first!)"
+    echo "3) Password Reset + Kick Sessions  - Change ALL passwords, create ccdcuser1/2, boot attackers"
+    echo "4) Deploy Hardening Scripts        - Copy toolkit to all machines (option to run)"
+    echo "5) Deploy Wazuh Agents             - Install Wazuh agent on all machines"
+    echo "6) Deploy Splunk Forwarders        - Install Splunk forwarder on all machines"
+    echo "7) Gather Facts                    - Collect system info from all machines"
     echo "8) Run custom playbook"
     echo ""
     echo "0) Back to main menu"
@@ -359,13 +374,15 @@ main_menu() {
     while true; do
         show_banner
         
-        echo "1) Quick Harden (this machine)"
+        echo -e "${YELLOW}Options 1 & 3 affect THIS machine. Option 2 affects OTHER machines.${NC}"
+        echo ""
+        echo "1) Quick Harden (this machine) - SSH, firewall, services, kernel. No passwords."
         if [ "$IS_ANSIBLE_CONTROLLER" = true ]; then
-            echo "2) Ansible Control Panel"
+            echo "2) Ansible Control Panel     - Manage all machines remotely"
         else
-            echo "2) Ansible Control Panel (not available - pip3 install ansible pywinrm)"
+            echo "2) Ansible Control Panel     - (not available - pip3 install ansible pywinrm)"
         fi
-        echo "3) Advanced Options"
+        echo "3) Advanced Options          - Individual tools, SIEM agents, IR"
         echo ""
         echo "q) Quit"
         echo ""
@@ -412,16 +429,38 @@ case "${1:-}" in
         exit 0
         ;;
     --help|-h)
-        echo "CCDC26 Toolkit - All-in-One Deployment Script"
+        echo "CCDC26 Toolkit"
         echo ""
-        echo "Usage: $0 [option]"
+        echo "Usage: sudo $0 [option]"
         echo ""
-        echo "Options:"
+        echo "OPTIONS:"
         echo "  (none)      Interactive menu"
-        echo "  --quick     Run quick hardening on local system"
-        echo "  --ansible   Show Ansible deployment menu"
+        echo "  --quick     Quick harden THIS machine (no passwords changed)"
+        echo "  --ansible   Jump to Ansible menu (manage OTHER machines)"
         echo "  --help      Show this help"
         echo ""
+        echo "MAIN MENU OPTIONS:"
+        echo "  1) Quick Harden    - Hardens THIS machine only"
+        echo "                       Does: SSH, firewall, services, permissions, kernel"
+        echo "                       Does NOT: Change passwords"
+        echo "                       Time: ~2 minutes"
+        echo ""
+        echo "  2) Ansible Panel   - Manage OTHER machines via SSH/WinRM"
+        echo "                       Requires: pip3 install ansible pywinrm"
+        echo "                       Key options:"
+        echo "                         3) Password Reset - Changes ALL passwords everywhere"
+        echo "                         4) Deploy Hardening - Copies+runs scripts on all machines"
+        echo ""
+        echo "  3) Advanced        - Individual tools for THIS machine"
+        echo "                       SIEM agents, persistence hunting, IR tools"
+        echo ""
+        echo "TYPICAL WORKFLOW:"
+        echo "  1. sudo ./deploy.sh → 2 → 2  (Test Ansible connectivity)"
+        echo "  2. sudo ./deploy.sh → 2 → 3  (Change all passwords)"
+        echo "  3. sudo ./deploy.sh → 1      (Harden this machine)"
+        echo "  4. sudo ./deploy.sh → 2 → 4  (Harden all other machines)"
+        echo ""
+        echo "See QUICKREF.md for full documentation."
         exit 0
         ;;
 esac

@@ -1,12 +1,9 @@
 ---
 # CCDC26 - Password Reset and Session Termination Playbook
 # 
-# This is the FIRST playbook to run at competition start!
-# 
 # Actions:
-#   1. Creates competition admin users (ccdcuser1, ccdcuser2)
-#   2. Resets ALL non-system user passwords
-#   3. Kills all active sessions to boot out adversaries
+#   1. Resets ALL non-system user passwords to the password you provide
+#   2. Kills all active sessions to boot out adversaries
 #
 # Usage:
 #   ansible-playbook -i inventory.ini changepw_kick.yml
@@ -18,30 +15,12 @@
   gather_facts: yes
 
   vars_prompt:
-    - name: temp_password
+    - name: new_password
       prompt: "Enter the new password for ALL users"
       private: yes
       confirm: yes
 
   tasks:
-    - name: Create ccdcuser1 (admin)
-      user:
-        name: ccdcuser1
-        password: "{{ temp_password | password_hash('sha512') }}"
-        groups: "{{ 'sudo' if ansible_os_family == 'Debian' else 'wheel' }}"
-        append: yes
-        state: present
-        shell: /bin/bash
-      register: user1_created
-
-    - name: Create ccdcuser2 (non-admin)
-      user:
-        name: ccdcuser2
-        password: "{{ temp_password | password_hash('sha512') }}"
-        state: present
-        shell: /bin/bash
-      register: user2_created
-
     - name: Gather non-system users (UID >= 1000)
       shell: |
         awk -F: '$3 >= 1000 && $3 < 65534 && $7 !~ /nologin|false/ {print $1}' /etc/passwd
@@ -52,17 +31,22 @@
       debug:
         msg: "Will reset password for: {{ valid_users.stdout_lines | join(', ') }}"
 
-    - name: Reset password for each valid user
+    - name: Reset password for each user
       user:
         name: "{{ item }}"
-        password: "{{ temp_password | password_hash('sha512') }}"
+        password: "{{ new_password | password_hash('sha512') }}"
         update_password: always
       loop: "{{ valid_users.stdout_lines }}"
-      when: item not in ['ccdcuser1', 'ccdcuser2']
 
-    - name: Kill all sessions for non-competition users
+    - name: Also reset root password
+      user:
+        name: root
+        password: "{{ new_password | password_hash('sha512') }}"
+        update_password: always
+
+    - name: Kill all user sessions
       shell: |
-        for user in {{ valid_users.stdout_lines | difference(['ccdcuser1', 'ccdcuser2']) | join(' ') }}; do
+        for user in {{ valid_users.stdout_lines | join(' ') }}; do
           pkill -KILL -u "$user" 2>/dev/null || true
         done
       ignore_errors: yes
@@ -77,11 +61,7 @@
 
     - name: Display completion message
       debug:
-        msg: |
-          Password reset complete!
-          Created users: ccdcuser1 (admin), ccdcuser2
-          Reset {{ valid_users.stdout_lines | length }} user passwords
-          All sessions terminated
+        msg: "Password reset complete! Changed {{ valid_users.stdout_lines | length }} user(s) + root. All sessions terminated."
 
 
 - name: Reset passwords (Windows)
@@ -89,36 +69,17 @@
   gather_facts: yes
 
   vars_prompt:
-    - name: temp_password
+    - name: new_password
       prompt: "Enter the new password for ALL Windows users"
       private: yes
       confirm: yes
 
   tasks:
-    - name: Create ccdcuser1 (admin)
-      win_user:
-        name: ccdcuser1
-        password: "{{ temp_password }}"
-        state: present
-        groups:
-          - Administrators
-          - "Remote Desktop Users"
-      register: win_user1
-
-    - name: Create ccdcuser2 (non-admin)
-      win_user:
-        name: ccdcuser2
-        password: "{{ temp_password }}"
-        state: present
-        groups:
-          - "Remote Desktop Users"
-      register: win_user2
-
     - name: Get local users
       win_shell: |
         Get-LocalUser | Where-Object { 
           $_.Enabled -eq $true -and 
-          $_.Name -notin @('DefaultAccount', 'WDAGUtilityAccount', 'ccdcuser1', 'ccdcuser2')
+          $_.Name -notin @('DefaultAccount', 'WDAGUtilityAccount')
         } | Select-Object -ExpandProperty Name
       register: local_users
       changed_when: false
@@ -131,7 +92,7 @@
     - name: Reset password for each local user
       win_user:
         name: "{{ item }}"
-        password: "{{ temp_password }}"
+        password: "{{ new_password }}"
         update_password: always
       loop: "{{ local_users.stdout_lines }}"
       when: local_users.stdout_lines | length > 0
@@ -153,7 +114,4 @@
 
     - name: Display completion message
       debug:
-        msg: |
-          Windows password reset complete!
-          Created users: ccdcuser1 (admin), ccdcuser2
-          Reset {{ local_users.stdout_lines | length }} user passwords
+        msg: "Windows password reset complete! Changed {{ local_users.stdout_lines | length }} user(s). All sessions terminated."
