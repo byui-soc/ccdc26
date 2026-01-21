@@ -262,6 +262,42 @@ advanced_menu() {
 #=============================================================================
 # ANSIBLE MENU
 #=============================================================================
+
+# Global ansible settings
+ANSIBLE_AUTH_MODE="prompt"  # "prompt" = ask for passwords, "inventory" = use inventory file
+ANSIBLE_EXTRA_ARGS=""
+
+setup_ansible_auth() {
+    header "Ansible Authentication Setup"
+    echo "How do you want to authenticate to remote hosts?"
+    echo ""
+    echo "  1) Prompt for passwords (RECOMMENDED - more secure)"
+    echo "     Will ask for SSH password and sudo password at runtime"
+    echo ""
+    echo "  2) Use inventory file credentials (faster, less secure)"
+    echo "     Uses ansible_password and ansible_become_pass from inventory.ini"
+    echo ""
+    read -p "Select [1-2] (default: 1): " auth_choice
+    
+    case $auth_choice in
+        2)
+            ANSIBLE_AUTH_MODE="inventory"
+            ANSIBLE_EXTRA_ARGS=""
+            info "Using inventory file credentials"
+            ;;
+        *)
+            ANSIBLE_AUTH_MODE="prompt"
+            ANSIBLE_EXTRA_ARGS="--ask-pass --ask-become-pass"
+            info "Will prompt for SSH and sudo passwords"
+            ;;
+    esac
+    
+    # Always disable host key checking for CCDC speed
+    export ANSIBLE_HOST_KEY_CHECKING=False
+    success "Host key checking disabled"
+    echo ""
+}
+
 ansible_menu() {
     if [ "$IS_ANSIBLE_CONTROLLER" != true ]; then
         error "Ansible is not installed"
@@ -269,10 +305,17 @@ ansible_menu() {
         return
     fi
     
+    # Setup auth on first run
+    if [ -z "$ANSIBLE_AUTH_CONFIGURED" ]; then
+        setup_ansible_auth
+        ANSIBLE_AUTH_CONFIGURED=true
+    fi
+    
     header "Ansible Control Panel"
     
     echo -e "${YELLOW}These commands run on OTHER machines listed in ansible/inventory.ini${NC}"
     echo -e "${YELLOW}This machine is the controller - it sends commands via SSH/WinRM.${NC}"
+    echo -e "Auth mode: ${GREEN}$ANSIBLE_AUTH_MODE${NC} | Extra args: ${GREEN}${ANSIBLE_EXTRA_ARGS:-none}${NC}"
     echo ""
     echo "1) Generate inventory from CSV     - Convert CSV to inventory.ini"
     echo "2) Test connectivity               - Verify Ansible can reach all machines (run first!)"
@@ -282,6 +325,7 @@ ansible_menu() {
     echo "6) Deploy Splunk Forwarders        - Install Splunk forwarder on all machines"
     echo "7) Gather Facts                    - Collect system info from all machines"
     echo "8) Run custom playbook"
+    echo "9) Change auth mode                - Switch between prompt/inventory auth"
     echo ""
     echo "0) Back to main menu"
     echo ""
@@ -303,14 +347,14 @@ ansible_menu() {
             ;;
         2)
             header "Testing Connectivity"
-            ansible all -i "$ANSIBLE_DIR/inventory.ini" -m ping
+            ansible all -i "$ANSIBLE_DIR/inventory.ini" -m ping $ANSIBLE_EXTRA_ARGS
             ;;
         3)
             header "Password Reset and User Creation"
             warn "This will reset ALL user passwords and create competition users!"
             read -p "Continue? (y/n): " confirm
             if [ "$confirm" = "y" ]; then
-                ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/changepw_kick.yml"
+                ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/changepw_kick.yml" $ANSIBLE_EXTRA_ARGS
             fi
             ;;
         4)
@@ -323,10 +367,10 @@ ansible_menu() {
             
             case $deploy_opt in
                 1)
-                    ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/deploy_hardening.yml"
+                    ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/deploy_hardening.yml" $ANSIBLE_EXTRA_ARGS
                     ;;
                 2)
-                    ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/deploy_hardening.yml" -e "run_full=true"
+                    ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/deploy_hardening.yml" -e "run_full=true" $ANSIBLE_EXTRA_ARGS
                     ;;
             esac
             ;;
@@ -334,7 +378,7 @@ ansible_menu() {
             header "Deploy Wazuh Agents (Primary SIEM)"
             read -p "Enter Wazuh manager IP: " wazuh_ip
             if [ -n "$wazuh_ip" ]; then
-                ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/deploy_wazuh.yml" -e "wazuh_manager=$wazuh_ip"
+                ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/deploy_wazuh.yml" -e "wazuh_manager=$wazuh_ip" $ANSIBLE_EXTRA_ARGS
             else
                 error "Wazuh manager IP required"
             fi
@@ -342,21 +386,26 @@ ansible_menu() {
         6)
             header "Deploy Splunk Forwarders (Backup SIEM)"
             info "Forwarding to competition Splunk server: 172.20.242.20:9997"
-            ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/deploy_splunk_forwarders.yml"
+            ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/deploy_splunk_forwarders.yml" $ANSIBLE_EXTRA_ARGS
             ;;
         7)
             header "Gathering Facts"
-            ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/gather_facts.yml"
+            ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/gather_facts.yml" $ANSIBLE_EXTRA_ARGS
             success "Facts saved to: $ANSIBLE_DIR/collected_facts/"
             ;;
         8)
             header "Run Custom Playbook"
             read -p "Enter playbook path: " playbook
             if [ -f "$playbook" ]; then
-                ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$playbook"
+                ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$playbook" $ANSIBLE_EXTRA_ARGS
             else
                 error "Playbook not found: $playbook"
             fi
+            ;;
+        9)
+            ANSIBLE_AUTH_CONFIGURED=""
+            setup_ansible_auth
+            ANSIBLE_AUTH_CONFIGURED=true
             ;;
         0)
             return
