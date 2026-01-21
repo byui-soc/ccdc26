@@ -121,7 +121,7 @@ local_menu() {
             fi
             header "Running Quick Harden"
             cd "$SCRIPT_DIR/linux-scripts"
-            bash ./hardening/full-harden.sh <<< "y"
+            bash ./hardening/full-harden.sh
             ;;
         2)
             if [ "$IS_ROOT" != true ]; then
@@ -401,7 +401,7 @@ case "${1:-}" in
         fi
         header "Quick Harden Mode"
         cd "$SCRIPT_DIR/linux-scripts"
-        bash ./hardening/full-harden.sh <<< "y"
+        bash ./hardening/full-harden.sh
         exit 0
         ;;
     --ansible|-a)
