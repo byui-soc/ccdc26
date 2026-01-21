@@ -167,6 +167,123 @@ Your public IPs = **172.25.(20+team#).XXX**
 
 ---
 
+## MACHINE STARTUP CHECKLISTS (Prerequisites by OS)
+
+Before you can download and run the toolkit, each machine needs certain packages installed.
+
+### Fedora (Webmail - 172.20.242.40)
+```bash
+# Install prerequisites
+sudo dnf install -y git curl wget
+
+# If this is your Ansible controller, also run:
+sudo dnf install -y python3-pip
+pip3 install ansible pywinrm
+
+# Clone and run
+git clone https://github.com/YOUR_REPO/ccdc26.git /opt/ccdc26
+cd /opt/ccdc26
+sudo bash deploy.sh
+```
+
+### Ubuntu (Ecom - 172.20.242.30, Workstation - DHCP)
+```bash
+# Install prerequisites
+sudo apt update
+sudo apt install -y git curl wget
+
+# If this is your Ansible controller, also run:
+sudo apt install -y python3-pip
+pip3 install ansible pywinrm
+
+# Clone and run
+git clone https://github.com/YOUR_REPO/ccdc26.git /opt/ccdc26
+cd /opt/ccdc26
+sudo bash deploy.sh
+```
+
+### Oracle Linux (Splunk - 172.20.242.20)
+```bash
+# Install prerequisites
+sudo dnf install -y git curl wget
+
+# If this is your Ansible controller, also run:
+sudo dnf install -y python3-pip
+pip3 install ansible pywinrm
+
+# Clone and run
+git clone https://github.com/YOUR_REPO/ccdc26.git /opt/ccdc26
+cd /opt/ccdc26
+sudo bash deploy.sh
+```
+
+### Windows Server 2019/2022 & Windows 11
+```powershell
+# Option 1: If git is available
+git clone https://github.com/YOUR_REPO/ccdc26.git C:\ccdc26
+
+# Option 2: Download ZIP from GitHub
+Invoke-WebRequest -Uri "https://github.com/YOUR_REPO/ccdc26/archive/main.zip" -OutFile C:\ccdc26.zip
+Expand-Archive C:\ccdc26.zip -DestinationPath C:\
+Rename-Item C:\ccdc26-main C:\ccdc26
+
+
+# Run hardening
+cd C:\ccdc26\windows-scripts\hardening
+.\Full-Harden.ps1 -q
+
+# On Domain Controller only:
+.\AD-Harden.ps1 -q
+```
+
+### VyOS Router (172.16.101.1)
+```bash
+# VyOS is read-only filesystem - can't install packages
+# Copy scripts manually or run commands from cheatsheet
+# Focus on: password change, firewall rules, logging
+configure
+set system login user vyos authentication plaintext-password 'NewSecureP@ss!'
+commit
+save
+```
+
+### Quick Reference Table
+
+| Machine | OS | Package Manager | Prerequisites Command |
+|---------|----|-----------------|-----------------------|
+| Fedora Webmail | Fedora | dnf | `sudo dnf install -y git curl` |
+| Ubuntu Ecom | Ubuntu | apt | `sudo apt install -y git curl` |
+| Ubuntu Wks | Ubuntu | apt | `sudo apt install -y git curl docker.io` |
+| Splunk | Oracle Linux | dnf | `sudo dnf install -y git curl` |
+| Windows boxes | Windows | N/A | Download ZIP or copy from USB |
+| VyOS | VyOS | N/A | Read-only - use commands directly |
+
+### Ansible Controller Setup (pick ONE Linux box)
+
+Recommended: **Ubuntu Workstation** (has DHCP, good for central management)
+
+```bash
+# Full Ansible controller setup
+sudo apt update && sudo apt install -y git curl python3-pip
+pip3 install ansible pywinrm requests
+
+# Verify
+ansible --version
+python3 -c "import winrm; print('pywinrm OK')"
+
+# Clone toolkit
+git clone https://github.com/YOUR_REPO/ccdc26.git /opt/ccdc26
+cd /opt/ccdc26
+
+# Update inventory with correct IPs/passwords
+nano ansible/inventory.ini
+
+# Test connectivity
+ansible all -i ansible/inventory.ini -m ping
+```
+
+---
+
 ## FIRST 15 MINUTES CHECKLIST
 
 ### Immediately After Drop Flag (9:00 AM)

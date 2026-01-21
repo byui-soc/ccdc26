@@ -16,27 +16,62 @@ AUTHORIZED_USERS="root"
 # Users that should have sudo access (space-separated)
 AUTHORIZED_SUDO="root"
 
-# Password to set for all users (or leave empty to generate random)
-TEAM_PASSWORD=""
-
 #=============================================================================
 # PASSWORD MANAGEMENT
 #=============================================================================
 change_all_passwords() {
     header "Changing All User Passwords"
     
+    # List users that will be affected
+    local users_list=$(get_human_users)
+    info "Users that will have passwords changed:"
+    for user in $users_list; do
+        echo "  - $user"
+    done
+    echo ""
+    
+    # Prompt for password
+    warn "YOU MUST REMEMBER THIS PASSWORD - you will need it to log back in!"
+    echo ""
+    read -sp "Enter new password for ALL users: " new_pass
+    echo ""
+    read -sp "Confirm password: " confirm_pass
+    echo ""
+    
+    if [ "$new_pass" != "$confirm_pass" ]; then
+        error "Passwords do not match!"
+        return 1
+    fi
+    
+    if [ -z "$new_pass" ]; then
+        error "Password cannot be empty!"
+        return 1
+    fi
+    
+    if [ ${#new_pass} -lt 8 ]; then
+        warn "Password is less than 8 characters - are you sure?"
+        read -p "Continue anyway? (y/n): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            return 1
+        fi
+    fi
+    
+    # Final confirmation
+    echo ""
+    warn "About to change passwords for: $users_list"
+    read -p "Are you SURE? Type 'yes' to confirm: " confirm
+    if [ "$confirm" != "yes" ]; then
+        info "Cancelled."
+        return 1
+    fi
+    
+    # Now change passwords
     local password_file="/root/ccdc-passwords-$(timestamp).txt"
     echo "# CCDC Password List - Generated $(date)" > "$password_file"
     chmod 600 "$password_file"
     
-    for user in $(get_human_users); do
-        local new_pass
-        if [ -n "$TEAM_PASSWORD" ]; then
-            new_pass="$TEAM_PASSWORD"
-        else
-            new_pass=$(generate_password 16)
-        fi
-        
+    for user in $users_list; do
         echo "$user:$new_pass" | chpasswd
         if [ $? -eq 0 ]; then
             success "Changed password for: $user"
@@ -46,8 +81,9 @@ change_all_passwords() {
         fi
     done
     
-    warn "Passwords saved to: $password_file"
-    warn "SECURE THIS FILE AND DELETE AFTER COMPETITION"
+    echo ""
+    success "All passwords changed to the password you entered."
+    warn "Password backup saved to: $password_file"
     log_action "Changed passwords for all users"
 }
 

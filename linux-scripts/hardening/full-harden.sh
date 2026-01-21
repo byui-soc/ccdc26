@@ -21,12 +21,55 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
+# Prompt for team password FIRST before any changes
+header "Password Configuration"
+info "You will need a password for all user accounts."
+warn "REMEMBER THIS PASSWORD - you will need it to log back in!"
+echo ""
+read -sp "Enter team password for ALL users: " TEAM_PASSWORD
+echo ""
+read -sp "Confirm password: " confirm_pass
+echo ""
+
+if [ "$TEAM_PASSWORD" != "$confirm_pass" ]; then
+    error "Passwords do not match! Aborting."
+    exit 1
+fi
+
+if [ -z "$TEAM_PASSWORD" ]; then
+    error "Password cannot be empty! Aborting."
+    exit 1
+fi
+
+export TEAM_PASSWORD
+success "Password confirmed. Proceeding with hardening..."
+echo ""
+
 # Record start time
 START_TIME=$(date +%s)
 
 header "Phase 1: User Account Hardening"
-info "Changing passwords and disabling unauthorized users..."
-bash "$SCRIPT_DIR/users.sh" <<< "7"
+info "Changing passwords and securing user accounts..."
+# Run user hardening without password change (we'll do it ourselves)
+source "$SCRIPT_DIR/users.sh"
+audit_users
+# Change passwords using the password we collected
+password_file="/root/ccdc-passwords-$(timestamp).txt"
+echo "# CCDC Password List - Generated $(date)" > "$password_file"
+chmod 600 "$password_file"
+for user in $(get_human_users); do
+    echo "$user:$TEAM_PASSWORD" | chpasswd
+    if [ $? -eq 0 ]; then
+        success "Changed password for: $user"
+        echo "$user : $TEAM_PASSWORD" >> "$password_file"
+    else
+        error "Failed to change password for: $user"
+    fi
+done
+warn "Passwords saved to: $password_file"
+disable_unauthorized_users
+harden_sudo
+set_password_policy
 
 header "Phase 2: SSH Hardening"
 info "Securing SSH configuration..."
