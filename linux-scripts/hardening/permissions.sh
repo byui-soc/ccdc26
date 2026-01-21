@@ -310,13 +310,13 @@ check_immutable_files() {
         fi
     done
     
-    # Find all immutable files
+    # Find all immutable files using recursive lsattr (much faster)
     info "Scanning for all immutable files..."
-    find / -xdev -type f 2>/dev/null | while read -r file; do
-        local attrs=$(lsattr "$file" 2>/dev/null | awk '{print $1}')
-        if echo "$attrs" | grep -q "i"; then
-            log_finding "Immutable file: $file"
-        fi
+    # lsattr -R is faster than calling lsattr per-file
+    # Output format: "----i--------e-- /path/to/file" - 'i' in position 5 means immutable
+    lsattr -R / 2>/dev/null | grep -E '^....i' | while read -r line; do
+        local file=$(echo "$line" | awk '{print $2}')
+        log_finding "Immutable file: $file"
     done
 }
 
