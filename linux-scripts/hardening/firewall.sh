@@ -10,18 +10,93 @@ header "Firewall Configuration"
 #=============================================================================
 # CONFIGURATION - EDIT THESE FOR YOUR SERVICES
 #=============================================================================
+# CCDC SERVICE DETECTION - Auto-detect running services and allow their ports
+# This prevents accidentally blocking scored services!
+
+detect_running_services() {
+    local detected_tcp=""
+    local detected_udp=""
+    
+    # Always allow SSH
+    detected_tcp="22"
+    
+    # Check for web servers (HTTP/HTTPS - SCORED)
+    if systemctl is-active apache2 &>/dev/null || systemctl is-active httpd &>/dev/null || \
+       systemctl is-active nginx &>/dev/null || pgrep -x "apache2\|httpd\|nginx" &>/dev/null; then
+        detected_tcp="$detected_tcp 80 443"
+        info "Detected: Web server (HTTP/HTTPS)"
+    fi
+    
+    # Check for mail servers (SMTP/POP3 - SCORED)
+    if systemctl is-active postfix &>/dev/null || systemctl is-active sendmail &>/dev/null || \
+       pgrep -x "master\|postfix\|sendmail" &>/dev/null; then
+        detected_tcp="$detected_tcp 25 587"
+        info "Detected: Mail server (SMTP)"
+    fi
+    if systemctl is-active dovecot &>/dev/null || pgrep -x "dovecot" &>/dev/null; then
+        detected_tcp="$detected_tcp 110 143 993 995"
+        info "Detected: Mail server (POP3/IMAP)"
+    fi
+    
+    # Check for DNS (SCORED on Windows but might exist on Linux)
+    if systemctl is-active named &>/dev/null || systemctl is-active bind9 &>/dev/null || \
+       pgrep -x "named" &>/dev/null; then
+        detected_tcp="$detected_tcp 53"
+        detected_udp="$detected_udp 53"
+        info "Detected: DNS server"
+    fi
+    
+    # Check for FTP
+    if systemctl is-active vsftpd &>/dev/null || systemctl is-active proftpd &>/dev/null || \
+       pgrep -x "vsftpd\|proftpd" &>/dev/null; then
+        detected_tcp="$detected_tcp 21 20"
+        info "Detected: FTP server"
+    fi
+    
+    # Check for database servers
+    if systemctl is-active mysql &>/dev/null || systemctl is-active mariadb &>/dev/null; then
+        detected_tcp="$detected_tcp 3306"
+        info "Detected: MySQL/MariaDB"
+    fi
+    if systemctl is-active postgresql &>/dev/null; then
+        detected_tcp="$detected_tcp 5432"
+        info "Detected: PostgreSQL"
+    fi
+    
+    # Check for Splunk (competition has Splunk server)
+    if systemctl is-active splunk &>/dev/null || pgrep -f "splunkd" &>/dev/null; then
+        detected_tcp="$detected_tcp 8000 8089 9997"
+        info "Detected: Splunk"
+    fi
+    
+    # Check for Wazuh
+    if systemctl is-active wazuh-manager &>/dev/null; then
+        detected_tcp="$detected_tcp 1514 1515 55000"
+        info "Detected: Wazuh Manager"
+    fi
+    
+    # Remove duplicates and format
+    DETECTED_TCP_PORTS=$(echo "$detected_tcp" | tr ' ' '\n' | sort -un | tr '\n' ' ')
+    DETECTED_UDP_PORTS=$(echo "$detected_udp" | tr ' ' '\n' | sort -un | tr '\n' ' ')
+}
+
+# Run detection
+detect_running_services
+
 # Allowed inbound TCP ports (space-separated)
-ALLOWED_TCP_PORTS="22"  # Add your services: "22 80 443 3306"
+# Auto-detected from running services - add more as needed
+ALLOWED_TCP_PORTS="${DETECTED_TCP_PORTS:-22 80 443}"
 
 # Allowed inbound UDP ports (space-separated)
-ALLOWED_UDP_PORTS=""    # e.g., "53 123"
+ALLOWED_UDP_PORTS="${DETECTED_UDP_PORTS:-}"
 
 # Allowed source networks (CIDR notation, space-separated)
 # Leave empty to allow from anywhere
 ALLOWED_NETWORKS=""     # e.g., "10.0.0.0/8 192.168.0.0/16"
 
 # Management/scoring network (always allowed)
-SCORING_NETWORK=""      # e.g., "172.16.0.0/24"
+# CCDC scoring comes from the competition infrastructure
+SCORING_NETWORK=""      # e.g., "172.25.0.0/16" for competition scoring
 
 #=============================================================================
 # UFW (Ubuntu/Debian)

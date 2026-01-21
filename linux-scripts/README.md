@@ -18,8 +18,8 @@ sudo ./services/harden-all.sh
 sudo ./tools/fail2ban-setup.sh
 sudo ./tools/security-tools.sh
 
-# Set up Splunk log forwarding (edit SPLUNK_SERVER first!)
-sudo ./tools/splunk-forwarder.sh
+# Set up Wazuh agent (edit WAZUH_MANAGER first!)
+sudo ./tools/wazuh-agent.sh
 
 # Start monitoring
 sudo ./monitoring/deploy-monitoring.sh
@@ -31,7 +31,7 @@ sudo ./persistence-hunting/full-hunt.sh
 ## Directory Structure
 
 ```
-ccdc-toolkit/
+linux-scripts/
 ├── hardening/              # System hardening scripts
 │   ├── full-harden.sh      # Run all hardening (use first!)
 │   ├── users.sh            # User account hardening
@@ -50,7 +50,9 @@ ccdc-toolkit/
 ├── tools/                  # Security tools setup
 │   ├── fail2ban-setup.sh   # Fail2ban installation & config
 │   ├── security-tools.sh   # Auditd, rkhunter, lynis, etc.
-│   └── splunk-forwarder.sh # Splunk Universal Forwarder setup
+│   ├── wazuh-agent.sh      # Wazuh agent setup (primary SIEM)
+│   ├── wazuh-server.sh     # Wazuh server (all-in-one) setup
+│   └── splunk-forwarder.sh # Splunk forwarder (backup SIEM)
 ├── persistence-hunting/    # Find attacker persistence
 │   ├── full-hunt.sh        # Run all persistence checks
 │   ├── cron-audit.sh       # Cron job analysis
@@ -69,12 +71,10 @@ ccdc-toolkit/
 │   ├── collect-evidence.sh # Evidence collection
 │   ├── kill-session.sh     # Kill attacker sessions
 │   ├── isolate.sh          # Network isolation
-│   ├── incident_responder.sh # Automatic Incident Responder (blocks attackers)
+│   ├── incident_responder.sh # Automatic Incident Responder
 │   └── restore-service.sh  # Service recovery
-├── utils/                  # Utility functions
-│   └── common.sh           # Shared functions
-└── docs/                   # Documentation
-    └── runbook.md          # Competition runbook
+└── utils/                  # Utility functions
+    └── common.sh           # Shared functions
 ```
 
 ## Priority Order During Competition
@@ -87,13 +87,13 @@ ccdc-toolkit/
 ### Next 30 Minutes (Important)
 4. `./services/harden-all.sh` - Harden all detected services
 5. `./tools/fail2ban-setup.sh` - Set up intrusion prevention
-6. `./tools/splunk-forwarder.sh` - Set up centralized logging to Splunk
+6. `./tools/wazuh-agent.sh` - Set up centralized logging to Wazuh
 7. `./persistence-hunting/full-hunt.sh` - Find backdoors
 8. `./monitoring/deploy-monitoring.sh` - Start monitoring
 
 ### Ongoing
 - Monitor alerts from `./monitoring/`
-- Setup `./incident-response/incident_responder.sh` to monitor network traffic and automatically shut down new sessions (will trigger if you login with a new user)
+- Setup `./incident-response/incident_responder.sh` to monitor network traffic
 - Re-run persistence hunting periodically
 - Use IR tools as needed
 
@@ -116,44 +116,51 @@ Run `./services/harden-all.sh` to auto-detect and secure all services.
 - **chkrootkit**: Rootkit detection
 - **lynis**: Security auditing
 - **ClamAV**: Antivirus scanning
-- **Splunk Universal Forwarder**: Centralized log forwarding
+- **Wazuh Agent**: Centralized log forwarding (primary SIEM)
+- **Splunk Forwarder**: Backup log forwarding to competition Splunk server
 
-## Splunk Log Forwarding
+## SIEM Integration
 
-The toolkit includes a Splunk Universal Forwarder setup script that forwards ALL logs to a central Splunk server.
+### Primary: Wazuh
 
-### Setup
+The toolkit includes Wazuh agent and server setup scripts for centralized security monitoring.
 
-1. Edit `tools/splunk-forwarder.sh` and set `SPLUNK_SERVER` to your Splunk indexer IP
-2. Run the script: `sudo ./tools/splunk-forwarder.sh`
+### Agent Setup
+
+1. Edit `tools/wazuh-agent.sh` and set `WAZUH_MANAGER` to your manager IP
+2. Run the script: `sudo ./tools/wazuh-agent.sh`
 3. Select option 1 for quick setup
 
-### Logs Forwarded
+### Server Setup
 
-The forwarder collects logs from all sources:
-- **Security**: auth.log, secure, audit.log, fail2ban
-- **System**: syslog, messages, kern.log, cron
-- **Web**: Apache access/error, Nginx access/error
-- **Database**: MySQL, MariaDB, PostgreSQL
-- **Mail**: mail.log, maillog
-- **DNS**: BIND/named query and security logs
-- **FTP**: vsftpd, ProFTPD logs
-- **CCDC Toolkit**: All toolkit monitoring output
-- **Containers**: Docker JSON logs
+To deploy a Wazuh server (manager + indexer + dashboard):
+```bash
+sudo ./tools/wazuh-server.sh
+# Option 1: Docker (quick testing)
+# Option 2: Package installation (production)
+```
 
-### Splunk Indexes Required
+### Features
 
-Create these indexes on your Splunk server:
-- `main` - Default index
-- `security` - Authentication, audit, intrusion prevention logs
-- `os` - System and kernel logs
-- `web` - Web server logs
-- `database` - Database logs
-- `mail` - Mail server logs
-- `dns` - DNS server logs
-- `ftp` - FTP server logs
-- `ccdc` - CCDC toolkit logs
-- `containers` - Docker/container logs
+Wazuh provides:
+- **Log Collection** - System, web, database, mail, DNS logs
+- **File Integrity Monitoring** - Real-time file change detection
+- **Rootkit Detection** - Scans for known rootkits
+- **Vulnerability Detection** - CVE scanning
+- **Active Response** - Auto-block brute force attacks
+- **CIS Benchmarks** - Compliance checking
+
+### Backup: Splunk Forwarder
+
+The competition has an existing Splunk server at **172.20.242.20**. Set up log forwarding as a backup:
+
+```bash
+# Quick setup - forwards all logs to competition Splunk
+sudo ./tools/splunk-forwarder.sh
+# Select option 1 for quick setup
+```
+
+This provides redundancy - if Wazuh has issues, you still have visibility through Splunk.
 
 ## Distro Detection
 

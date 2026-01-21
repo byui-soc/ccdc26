@@ -1,54 +1,249 @@
-# CCDC26 Windows Defense Scripts
+# CCDC26 Windows Defense Toolkit
 
-PowerShell scripts for Windows system hardening and log forwarding during CCDC competition.
+Comprehensive PowerShell scripts for Windows system hardening, Active Directory security, and security monitoring during CCDC competition.
 
-## Scripts
+## Quick Start
 
-### Install-SplunkForwarder.ps1
-Deploys Splunk Universal Forwarder on Windows systems with comprehensive event log collection.
+```powershell
+# Run as Administrator!
 
-**Setup:**
-1. Edit the script and set `$SPLUNK_SERVER` to your Splunk indexer IP
-2. Run as Administrator: `.\Install-SplunkForwarder.ps1`
-3. Select option 1 for quick setup
+# Option 1: Interactive menu
+.\deploy.ps1
+
+# Option 2: Quick harden (all defaults)
+.\deploy.ps1 -Quick
+
+# Option 3: Run specific scripts
+.\hardening\Full-Harden.ps1      # Local system hardening
+.\hardening\AD-Harden.ps1        # Domain Controller hardening
+.\Install-WazuhAgent.ps1         # Wazuh agent setup
+```
+
+## Directory Structure
+
+```
+windows-scripts/
+├── hardening/
+│   ├── Full-Harden.ps1         # Main Windows hardening script
+│   ├── AD-Harden.ps1           # Active Directory specific hardening
+│   └── lib/
+│       ├── common.ps1          # Shared utility functions
+│       ├── auditing.ps1        # Advanced audit configuration
+│       └── passwords.ps1       # Zulu-style password generation
+├── Install-WazuhAgent.ps1      # Wazuh agent setup (primary SIEM)
+├── Install-SplunkForwarder.ps1 # Splunk forwarder (backup SIEM)
+└── README.md                   # This file
+```
+
+## Scripts Overview
+
+### Full-Harden.ps1
+
+Main hardening script for all Windows systems. Includes:
+
+**CVE Patches & Mitigations:**
+- MS17-010 (EternalBlue) - OS-specific patches
+- CVE-2021-34527 (PrintNightmare) - Spooler disabled, registry mitigations
+- Mimikatz mitigations - WDigest disabled, LSASS protection
+- SMB hardening - SMBv1 disabled, SMBv2/v3 enabled with signing
+
+**Windows Defender:**
+- Real-time protection enabled
+- 15 Attack Surface Reduction (ASR) rules
+- Exclusions removed
+- Tamper protection enabled
+
+**Backdoor Removal:**
+- Accessibility feature abuse (sethc.exe, Utilman.exe, etc.)
+- Scheduled task auditing
+- Image File Execution Options cleanup
+
+**Service Lockdown:**
+- Print Spooler disabled
+- Remote Registry disabled
+- Telnet, TFTP, SMBv1 features disabled
+
+**Usage:**
+```powershell
+# Interactive menu
+.\hardening\Full-Harden.ps1
+
+# Quick mode (all defaults)
+.\hardening\Full-Harden.ps1 -q
+```
+
+### AD-Harden.ps1
+
+Domain Controller specific hardening. Includes:
+
+**CVE Patches:**
+- CVE-2020-1472 (Zerologon) - Secure channel protection
+- CVE-2021-42278/42287 (noPac) - Machine account quota = 0
+
+**Kerberos Hardening:**
+- ASREP-roastable accounts fixed (pre-auth required)
+- Kerberoastable accounts fixed (AES encryption enabled)
+- DCSync permissions audited
+
+**User Management:**
+- Mass disable all users (except specified)
+- Competition user creation with deterministic passwords
+- Privileged group cleanup (Domain Admins, Enterprise Admins, etc.)
+
+**Additional:**
+- LDAP signing requirements
+- AD state backup before changes
+- Security GPO creation
+
+**Usage:**
+```powershell
+# Must run on Domain Controller!
+.\hardening\AD-Harden.ps1
+
+# Quick mode
+.\hardening\AD-Harden.ps1 -q
+```
+
+### lib/common.ps1
+
+Shared utilities (source in other scripts):
+- Color-coded output functions (Info, Success, Warn, Error)
+- OS version detection
+- Backup functions for files and registry
+- Service management helpers
+- Firewall helpers
+- Registry helpers
+- Common port definitions
+
+### lib/passwords.ps1
+
+Zulu-style deterministic password generation:
+- Generates passphrases from salt + username
+- Same inputs always produce same output
+- Enables team coordination without sharing plaintext
+
+**Usage:**
+```powershell
+# Interactive mode
+.\hardening\lib\passwords.ps1
+
+# In scripts
+. .\hardening\lib\passwords.ps1
+$password = Get-DeterministicPassword -Username "admin" -Salt "ccdc2026secret"
+# Returns: "dragon-falcon-sunset-prism-echo1"
+```
+
+### lib/auditing.ps1
+
+Comprehensive Windows auditing:
+- All audit policy subcategories enabled
+- Command line auditing (Event ID 4688)
+- PowerShell Script Block Logging
+- PowerShell Module Logging
+- PowerShell Transcription
+- Firewall logging (all profiles)
+- Sysmon installation (optional)
+
+### Install-WazuhAgent.ps1
+
+Deploys Wazuh agent for centralized security monitoring:
 
 **Windows Event Logs Collected:**
-- Security (logons, failed logons, privilege use, account changes)
-- System (services, errors)
+- Security (logons, auth, privilege use)
+- System
 - Application
-- PowerShell (script block logging enabled)
+- PowerShell (script block logging)
 - Windows Defender
 - Windows Firewall
-- Sysmon (if installed - highly recommended!)
+- Sysmon (if installed)
 - Task Scheduler
 - Remote Desktop Services
 - DNS Server (if DC)
 - Active Directory (if DC)
 - IIS Logs (if present)
-- DHCP Logs
-- BITS
 
-**Enhanced Logging Enabled:**
-- PowerShell Script Block Logging
-- PowerShell Module Logging
-- Command Line in Process Creation events
+**Additional Wazuh Features:**
+- File Integrity Monitoring (FIM)
+- Registry Monitoring
+- Rootkit Detection
+- System Inventory
+- CIS Benchmark Assessment
+
+**Setup:**
+```powershell
+# Edit the script to set WAZUH_MANAGER, or:
+.\Install-WazuhAgent.ps1
+# Enter manager IP when prompted
+```
+
+### Install-SplunkForwarder.ps1
+
+Deploys Splunk Universal Forwarder as **backup SIEM** to the competition Splunk server (172.20.242.20):
+
+**Setup:**
+```powershell
+.\Install-SplunkForwarder.ps1
+# Select option 1 for quick setup
+# Forwards to: 172.20.242.20:9997
+```
+
+This provides redundancy alongside Wazuh.
+
+## Priority Order During Competition
+
+### First 15 Minutes (Critical)
+1. Run `Full-Harden.ps1 -q` on all Windows systems
+2. Run `AD-Harden.ps1 -q` on Domain Controllers
+3. Change all passwords (use passwords.ps1 for consistency)
+
+### Next 30 Minutes (Important)
+4. Deploy Wazuh agents
+5. Configure firewall ports
+6. Audit scheduled tasks
+7. Review privileged group membership
+
+### Ongoing
+- Monitor Wazuh dashboards
+- Re-audit for persistence
+- Respond to alerts
+
+## CVEs Addressed
+
+| CVE | Name | Script | Action |
+|-----|------|--------|--------|
+| MS17-010 | EternalBlue | Full-Harden.ps1 | OS-specific patch |
+| CVE-2021-34527 | PrintNightmare | Full-Harden.ps1 | Spooler disabled, registry |
+| CVE-2020-1472 | Zerologon | AD-Harden.ps1 | Secure channel protection |
+| CVE-2021-42278/42287 | noPac | AD-Harden.ps1 | Machine account quota |
+| - | Mimikatz | Full-Harden.ps1 | WDigest, LSASS protection |
+| - | ASREP Roasting | AD-Harden.ps1 | Pre-auth required |
+| - | Kerberoasting | AD-Harden.ps1 | AES encryption |
+| - | DCSync | AD-Harden.ps1 | Permission audit |
 
 ## Requirements
+
 - Windows Server 2012+ or Windows 10+
 - PowerShell 5.0+
 - Administrator privileges
-- Network access to Splunk indexer
+- For AD scripts: Domain Admin on a DC
 
-## Sysmon Recommendation
-For enhanced visibility, install Sysmon:
-```powershell
-# Download from Microsoft Sysinternals
-# https://docs.microsoft.com/en-us/sysinternals/downloads/sysmon
+## Logs & Output
 
-# Install with default config
-sysmon64.exe -accepteula -i
-
-# Or use a community config (recommended)
-# https://github.com/SwiftOnSecurity/sysmon-config
-sysmon64.exe -accepteula -i sysmonconfig-export.xml
+All actions are logged to:
 ```
+C:\CCDC-Toolkit\logs\actions.log     # Action log
+C:\CCDC-Toolkit\logs\findings.log    # Security findings
+C:\CCDC-Toolkit\backups\             # Config backups
+```
+
+## Tips
+
+1. **Always run as Administrator**
+2. **Test in a VM first** before competition
+3. **Keep a terminal open** in case you lock yourself out
+4. **Use passwords.ps1** for consistent passwords across team
+5. **Backup before changes** (scripts do this automatically)
+6. **Document changes** for scoring
+
+## Author
+Brady Hodge - BYU-SOC Team (CCDC26)

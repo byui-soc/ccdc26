@@ -1,0 +1,159 @@
+---
+# CCDC26 - Password Reset and Session Termination Playbook
+# 
+# This is the FIRST playbook to run at competition start!
+# 
+# Actions:
+#   1. Creates competition admin users (ccdcuser1, ccdcuser2)
+#   2. Resets ALL non-system user passwords
+#   3. Kills all active sessions to boot out adversaries
+#
+# Usage:
+#   ansible-playbook -i inventory.ini changepw_kick.yml
+#
+
+- name: Reset passwords and terminate sessions (Linux)
+  hosts: linux
+  become: yes
+  gather_facts: yes
+
+  vars_prompt:
+    - name: temp_password
+      prompt: "Enter the new password for ALL users"
+      private: yes
+      confirm: yes
+
+  tasks:
+    - name: Create ccdcuser1 (admin)
+      user:
+        name: ccdcuser1
+        password: "{{ temp_password | password_hash('sha512') }}"
+        groups: "{{ 'sudo' if ansible_os_family == 'Debian' else 'wheel' }}"
+        append: yes
+        state: present
+        shell: /bin/bash
+      register: user1_created
+
+    - name: Create ccdcuser2 (non-admin)
+      user:
+        name: ccdcuser2
+        password: "{{ temp_password | password_hash('sha512') }}"
+        state: present
+        shell: /bin/bash
+      register: user2_created
+
+    - name: Gather non-system users (UID >= 1000)
+      shell: |
+        awk -F: '$3 >= 1000 && $3 < 65534 && $7 !~ /nologin|false/ {print $1}' /etc/passwd
+      register: valid_users
+      changed_when: false
+
+    - name: Display users to be reset
+      debug:
+        msg: "Will reset password for: {{ valid_users.stdout_lines | join(', ') }}"
+
+    - name: Reset password for each valid user
+      user:
+        name: "{{ item }}"
+        password: "{{ temp_password | password_hash('sha512') }}"
+        update_password: always
+      loop: "{{ valid_users.stdout_lines }}"
+      when: item not in ['ccdcuser1', 'ccdcuser2']
+
+    - name: Kill all sessions for non-competition users
+      shell: |
+        for user in {{ valid_users.stdout_lines | difference(['ccdcuser1', 'ccdcuser2']) | join(' ') }}; do
+          pkill -KILL -u "$user" 2>/dev/null || true
+        done
+      ignore_errors: yes
+      when: valid_users.stdout_lines | length > 0
+
+    - name: Force logout all TTY sessions
+      shell: |
+        who | awk '{print $2}' | while read tty; do
+          pkill -9 -t "$tty" 2>/dev/null || true
+        done
+      ignore_errors: yes
+
+    - name: Display completion message
+      debug:
+        msg: |
+          Password reset complete!
+          Created users: ccdcuser1 (admin), ccdcuser2
+          Reset {{ valid_users.stdout_lines | length }} user passwords
+          All sessions terminated
+
+
+- name: Reset passwords (Windows)
+  hosts: windows
+  gather_facts: yes
+
+  vars_prompt:
+    - name: temp_password
+      prompt: "Enter the new password for ALL Windows users"
+      private: yes
+      confirm: yes
+
+  tasks:
+    - name: Create ccdcuser1 (admin)
+      win_user:
+        name: ccdcuser1
+        password: "{{ temp_password }}"
+        state: present
+        groups:
+          - Administrators
+          - "Remote Desktop Users"
+      register: win_user1
+
+    - name: Create ccdcuser2 (non-admin)
+      win_user:
+        name: ccdcuser2
+        password: "{{ temp_password }}"
+        state: present
+        groups:
+          - "Remote Desktop Users"
+      register: win_user2
+
+    - name: Get local users
+      win_shell: |
+        Get-LocalUser | Where-Object { 
+          $_.Enabled -eq $true -and 
+          $_.Name -notin @('DefaultAccount', 'WDAGUtilityAccount', 'ccdcuser1', 'ccdcuser2')
+        } | Select-Object -ExpandProperty Name
+      register: local_users
+      changed_when: false
+
+    - name: Display users to be reset
+      debug:
+        msg: "Will reset password for: {{ local_users.stdout_lines | join(', ') }}"
+      when: local_users.stdout_lines | length > 0
+
+    - name: Reset password for each local user
+      win_user:
+        name: "{{ item }}"
+        password: "{{ temp_password }}"
+        update_password: always
+      loop: "{{ local_users.stdout_lines }}"
+      when: local_users.stdout_lines | length > 0
+      ignore_errors: yes
+
+    - name: Force logoff all users
+      win_shell: |
+        $sessions = quser 2>$null
+        if ($sessions) {
+          $sessions | Select-String "^\s*\w+" | ForEach-Object {
+            $line = $_.ToString().Trim() -split '\s+'
+            $sessionId = $line[2]
+            if ($sessionId -match '^\d+$') {
+              logoff $sessionId /server:localhost 2>$null
+            }
+          }
+        }
+      ignore_errors: yes
+
+    - name: Display completion message
+      debug:
+        msg: |
+          Windows password reset complete!
+          Created users: ccdcuser1 (admin), ccdcuser2
+          Reset {{ local_users.stdout_lines | length }} user passwords

@@ -109,8 +109,9 @@ StrictModes yes
 
 # Login settings
 MaxAuthTries 3
-MaxSessions 3
+MaxSessions 10
 LoginGraceTime 30
+# CCDC NOTE: MaxSessions increased to 10 for 8-person teams
 ClientAliveInterval 300
 ClientAliveCountMax 2
 

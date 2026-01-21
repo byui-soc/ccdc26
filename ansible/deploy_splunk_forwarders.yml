@@ -1,0 +1,284 @@
+---
+# CCDC26 - Deploy Splunk Forwarders to Competition Splunk Server
+# Backup SIEM forwarding (primary is Wazuh)
+#
+# Usage:
+#   ansible-playbook -i inventory.ini deploy_splunk_forwarders.yml
+#
+# Competition Splunk Server: 172.20.242.20:9997
+
+- name: Deploy Splunk forwarder to Linux hosts
+  hosts: linux
+  become: yes
+  gather_facts: yes
+  vars:
+    splunk_server: "172.20.242.20"
+    splunk_port: "9997"
+    splunk_version: "9.1.2"
+    splunk_home: "/opt/splunkforwarder"
+  tasks:
+    - name: Check if Splunk forwarder is already installed
+      stat:
+        path: "{{ splunk_home }}/bin/splunk"
+      register: splunk_installed
+
+    - name: Create temp directory
+      file:
+        path: /tmp/splunk_install
+        state: directory
+        mode: '0755'
+      when: not splunk_installed.stat.exists
+
+    # Debian/Ubuntu installation
+    - name: Download Splunk UF for Debian/Ubuntu
+      get_url:
+        url: "https://download.splunk.com/products/universalforwarder/releases/{{ splunk_version }}/linux/splunkforwarder-{{ splunk_version }}-linux-2.6-amd64.deb"
+        dest: /tmp/splunk_install/splunkforwarder.deb
+        mode: '0644'
+      when: 
+        - not splunk_installed.stat.exists
+        - ansible_os_family == "Debian"
+      ignore_errors: yes
+
+    - name: Install Splunk UF on Debian/Ubuntu
+      apt:
+        deb: /tmp/splunk_install/splunkforwarder.deb
+        state: present
+      when: 
+        - not splunk_installed.stat.exists
+        - ansible_os_family == "Debian"
+      ignore_errors: yes
+
+    # RHEL/CentOS installation
+    - name: Download Splunk UF for RHEL/CentOS
+      get_url:
+        url: "https://download.splunk.com/products/universalforwarder/releases/{{ splunk_version }}/linux/splunkforwarder-{{ splunk_version }}-linux-2.6-x86_64.rpm"
+        dest: /tmp/splunk_install/splunkforwarder.rpm
+        mode: '0644'
+      when: 
+        - not splunk_installed.stat.exists
+        - ansible_os_family == "RedHat"
+      ignore_errors: yes
+
+    - name: Install Splunk UF on RHEL/CentOS
+      yum:
+        name: /tmp/splunk_install/splunkforwarder.rpm
+        state: present
+        disable_gpg_check: yes
+      when: 
+        - not splunk_installed.stat.exists
+        - ansible_os_family == "RedHat"
+      ignore_errors: yes
+
+    - name: Create Splunk local config directory
+      file:
+        path: "{{ splunk_home }}/etc/system/local"
+        state: directory
+        mode: '0700'
+
+    - name: Configure outputs.conf
+      copy:
+        dest: "{{ splunk_home }}/etc/system/local/outputs.conf"
+        content: |
+          [tcpout]
+          defaultGroup = competition_splunk
+
+          [tcpout:competition_splunk]
+          server = {{ splunk_server }}:{{ splunk_port }}
+          compressed = true
+        mode: '0600'
+
+    - name: Configure inputs.conf
+      copy:
+        dest: "{{ splunk_home }}/etc/system/local/inputs.conf"
+        content: |
+          [default]
+          host = {{ ansible_hostname }}
+
+          [monitor:///var/log/auth.log]
+          disabled = false
+          sourcetype = linux_secure
+          index = security
+
+          [monitor:///var/log/secure]
+          disabled = false
+          sourcetype = linux_secure
+          index = security
+
+          [monitor:///var/log/syslog]
+          disabled = false
+          sourcetype = syslog
+          index = os
+
+          [monitor:///var/log/messages]
+          disabled = false
+          sourcetype = syslog
+          index = os
+
+          [monitor:///var/log/audit/audit.log]
+          disabled = false
+          sourcetype = linux_audit
+          index = security
+
+          [monitor:///var/log/apache2/*access*.log]
+          disabled = false
+          sourcetype = access_combined
+          index = web
+
+          [monitor:///var/log/httpd/*access*.log]
+          disabled = false
+          sourcetype = access_combined
+          index = web
+
+          [monitor:///var/log/nginx/access.log]
+          disabled = false
+          sourcetype = access_combined
+          index = web
+
+          [monitor:///var/log/mail.log]
+          disabled = false
+          sourcetype = sendmail
+          index = mail
+
+          [monitor:///var/log/maillog]
+          disabled = false
+          sourcetype = sendmail
+          index = mail
+        mode: '0600'
+
+    - name: Accept license and start Splunk forwarder
+      shell: |
+        {{ splunk_home }}/bin/splunk start --accept-license --answer-yes --no-prompt
+        {{ splunk_home }}/bin/splunk enable boot-start -systemd-managed 1 || {{ splunk_home }}/bin/splunk enable boot-start
+      ignore_errors: yes
+
+    - name: Clean up temp directory
+      file:
+        path: /tmp/splunk_install
+        state: absent
+
+- name: Deploy Splunk forwarder to Windows hosts
+  hosts: windows
+  gather_facts: yes
+  vars:
+    splunk_server: "172.20.242.20"
+    splunk_port: "9997"
+    splunk_version: "9.1.2"
+    splunk_home: "C:\\Program Files\\SplunkUniversalForwarder"
+  tasks:
+    - name: Check if Splunk forwarder is installed
+      win_stat:
+        path: "{{ splunk_home }}\\bin\\splunk.exe"
+      register: splunk_installed
+
+    - name: Download Splunk UF MSI
+      win_get_url:
+        url: "https://download.splunk.com/products/universalforwarder/releases/{{ splunk_version }}/windows/splunkforwarder-{{ splunk_version }}-x64-release.msi"
+        dest: "C:\\Windows\\Temp\\splunkforwarder.msi"
+      when: not splunk_installed.stat.exists
+      ignore_errors: yes
+
+    - name: Install Splunk UF
+      win_package:
+        path: "C:\\Windows\\Temp\\splunkforwarder.msi"
+        arguments: "AGREETOLICENSE=yes RECEIVING_INDEXER={{ splunk_server }}:{{ splunk_port }} LAUNCHSPLUNK=0 /quiet"
+        state: present
+      when: not splunk_installed.stat.exists
+      ignore_errors: yes
+
+    - name: Create Splunk local config directory
+      win_file:
+        path: "{{ splunk_home }}\\etc\\system\\local"
+        state: directory
+
+    - name: Configure outputs.conf
+      win_copy:
+        dest: "{{ splunk_home }}\\etc\\system\\local\\outputs.conf"
+        content: |
+          [tcpout]
+          defaultGroup = competition_splunk
+
+          [tcpout:competition_splunk]
+          server = {{ splunk_server }}:{{ splunk_port }}
+          compressed = true
+
+    - name: Configure inputs.conf for Windows
+      win_copy:
+        dest: "{{ splunk_home }}\\etc\\system\\local\\inputs.conf"
+        content: |
+          [default]
+          host = {{ ansible_hostname }}
+
+          [WinEventLog://Security]
+          disabled = false
+          index = security
+          sourcetype = WinEventLog:Security
+
+          [WinEventLog://System]
+          disabled = false
+          index = os
+          sourcetype = WinEventLog:System
+
+          [WinEventLog://Application]
+          disabled = false
+          index = os
+          sourcetype = WinEventLog:Application
+
+          [WinEventLog://Microsoft-Windows-PowerShell/Operational]
+          disabled = false
+          index = security
+          sourcetype = WinEventLog:PowerShell
+
+          [WinEventLog://Microsoft-Windows-Sysmon/Operational]
+          disabled = false
+          index = security
+          sourcetype = WinEventLog:Sysmon
+
+          [WinEventLog://DNS Server]
+          disabled = false
+          index = dns
+          sourcetype = WinEventLog:DNS
+
+    - name: Enable PowerShell Script Block Logging
+      win_regedit:
+        path: HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging
+        name: EnableScriptBlockLogging
+        data: 1
+        type: dword
+
+    - name: Start Splunk forwarder service
+      win_shell: |
+        & "{{ splunk_home }}\bin\splunk.exe" start --accept-license --answer-yes --no-prompt
+      ignore_errors: yes
+
+    - name: Set Splunk service to auto-start
+      win_service:
+        name: SplunkForwarder
+        start_mode: auto
+      ignore_errors: yes
+
+    - name: Clean up installer
+      win_file:
+        path: "C:\\Windows\\Temp\\splunkforwarder.msi"
+        state: absent
+
+- name: Summary
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  tasks:
+    - name: Display completion message
+      debug:
+        msg: |
+          =====================================================
+          SPLUNK FORWARDER DEPLOYMENT COMPLETE
+          =====================================================
+          Target server: 172.20.242.20:9997
+          
+          Splunk forwarders are now sending logs to the 
+          competition Splunk server as a BACKUP to Wazuh.
+          
+          Access Splunk web interface:
+            URL: https://172.20.242.20:8000
+            (Check competition credentials)
+          =====================================================

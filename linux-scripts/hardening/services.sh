@@ -11,17 +11,21 @@ header "Service Management"
 # CONFIGURATION
 #=============================================================================
 # Services that are commonly unnecessary/dangerous (will prompt before disabling)
+# NOTE: Web servers (apache2, httpd, nginx), mail servers (postfix, dovecot),
+#       FTP (vsftpd), and DNS (named, bind9) are EXCLUDED because they are
+#       typically SCORED SERVICES in CCDC competitions!
 DANGEROUS_SERVICES=(
     "telnet" "telnetd" "xinetd" "inetd"
     "rsh" "rlogin" "rexec" "rsh-server"
     "tftp" "tftpd" "atftpd"
-    "vsftpd" "proftpd" "pure-ftpd" "ftpd"
+    # "vsftpd" "proftpd" "pure-ftpd" "ftpd"  # REMOVED - FTP may be scored!
     "nfs" "nfs-server" "nfs-kernel-server" "rpcbind"
     "smbd" "nmbd" "samba"
     "snmpd"
     "avahi-daemon" "cups" "cups-browsed"
     "bluetooth" "bluez"
-    "apache2" "httpd" "nginx"  # Only if not needed
+    # "apache2" "httpd" "nginx"  # REMOVED - Web servers are SCORED!
+    # "postfix" "dovecot"        # NOT ADDED - Mail servers are SCORED!
 )
 
 # Services to keep (will never be disabled automatically)

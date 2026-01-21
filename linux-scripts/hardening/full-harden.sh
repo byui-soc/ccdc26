@@ -34,7 +34,20 @@ bash "$SCRIPT_DIR/ssh.sh" <<< "7"
 
 header "Phase 3: Firewall Configuration"
 info "Setting up firewall rules..."
-bash "$SCRIPT_DIR/firewall.sh" <<< "2"
+info "Detecting running services to avoid blocking scored services..."
+# Source firewall.sh to get detected ports, then run with auto-configure
+source "$SCRIPT_DIR/firewall.sh" 2>/dev/null || true
+echo ""
+warn "Firewall will allow these TCP ports: ${ALLOWED_TCP_PORTS:-22 80 443}"
+warn "Firewall will allow these UDP ports: ${ALLOWED_UDP_PORTS:-none}"
+echo ""
+read -p "Proceed with these ports? (y to continue, n to skip firewall): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    bash "$SCRIPT_DIR/firewall.sh" <<< "2"
+else
+    warn "Skipping firewall configuration - configure manually!"
+fi
 
 header "Phase 4: Service Management"
 info "Disabling dangerous services..."

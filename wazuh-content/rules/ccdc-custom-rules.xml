@@ -1,0 +1,426 @@
+<!--
+  CCDC26 Custom Wazuh Rules
+  
+  Custom detection rules for CCDC competitions
+  Rule IDs: 100000-100999 (reserved for custom rules)
+  
+  Installation:
+    Copy to /var/ossec/etc/rules/ on Wazuh manager
+    Or mount via Docker volume
+  
+  Restart manager after changes:
+    systemctl restart wazuh-manager
+-->
+
+<group name="ccdc,">
+
+  <!-- ============================================================ -->
+  <!-- AUTHENTICATION ALERTS -->
+  <!-- ============================================================ -->
+
+  <!-- Brute Force Detection - Linux SSH (5+ failures in 5 min) -->
+  <rule id="100001" level="10" frequency="5" timeframe="300">
+    <if_matched_sid>5710</if_matched_sid>
+    <same_source_ip/>
+    <description>CCDC: Brute force attack detected (SSH - 5+ failed logins in 5 minutes)</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <group>authentication_failures,brute_force,</group>
+  </rule>
+
+  <!-- Brute Force Detection - Linux PAM -->
+  <rule id="100002" level="10" frequency="5" timeframe="300">
+    <if_matched_sid>5503</if_matched_sid>
+    <same_source_ip/>
+    <description>CCDC: Brute force attack detected (PAM - 5+ failed logins in 5 minutes)</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <group>authentication_failures,brute_force,</group>
+  </rule>
+
+  <!-- Brute Force Detection - Windows (EventCode 4625) -->
+  <rule id="100003" level="10" frequency="5" timeframe="300">
+    <if_matched_sid>18106</if_matched_sid>
+    <same_source_ip/>
+    <description>CCDC: Brute force attack detected (Windows - 5+ failed logins in 5 minutes)</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <group>authentication_failures,brute_force,windows,</group>
+  </rule>
+
+  <!-- Root/Admin SSH Login Alert -->
+  <rule id="100004" level="8">
+    <if_sid>5715</if_sid>
+    <description>CCDC: Root login via SSH detected</description>
+    <mitre>
+      <id>T1078.003</id>
+    </mitre>
+    <group>authentication_success,admin_login,</group>
+  </rule>
+
+  <!-- Administrator Login - Windows -->
+  <rule id="100005" level="8">
+    <if_sid>18152</if_sid>
+    <field name="win.eventdata.targetUserName">Administrator</field>
+    <description>CCDC: Administrator login detected (Windows)</description>
+    <mitre>
+      <id>T1078.003</id>
+    </mitre>
+    <group>authentication_success,admin_login,windows,</group>
+  </rule>
+
+  <!-- SSH Login Outside Business Hours (before 6am or after 10pm) -->
+  <rule id="100006" level="6">
+    <if_sid>5501,5715</if_sid>
+    <time>22:00 - 06:00</time>
+    <description>CCDC: SSH login outside business hours (10PM - 6AM)</description>
+    <mitre>
+      <id>T1078</id>
+    </mitre>
+    <group>authentication_success,after_hours,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- USER/ACCOUNT ALERTS -->
+  <!-- ============================================================ -->
+
+  <!-- New User Created - Linux -->
+  <rule id="100010" level="12">
+    <if_sid>5902</if_sid>
+    <description>CCDC CRITICAL: New user account created (Linux)</description>
+    <mitre>
+      <id>T1136.001</id>
+    </mitre>
+    <group>account_changed,user_created,</group>
+  </rule>
+
+  <!-- New User Created - Windows (EventCode 4720) -->
+  <rule id="100011" level="12">
+    <if_sid>18109</if_sid>
+    <description>CCDC CRITICAL: New user account created (Windows)</description>
+    <mitre>
+      <id>T1136.001</id>
+    </mitre>
+    <group>account_changed,user_created,windows,</group>
+  </rule>
+
+  <!-- User Added to Sudo/Wheel Group - Linux -->
+  <rule id="100012" level="12">
+    <if_sid>5904</if_sid>
+    <match>sudo|wheel|admin</match>
+    <description>CCDC CRITICAL: User added to privileged group (sudo/wheel/admin)</description>
+    <mitre>
+      <id>T1078.003</id>
+    </mitre>
+    <group>account_changed,privilege_escalation,</group>
+  </rule>
+
+  <!-- User Added to Administrators - Windows (EventCode 4732) -->
+  <rule id="100013" level="12">
+    <if_sid>18108</if_sid>
+    <field name="win.eventdata.targetUserName">Administrators|Domain Admins</field>
+    <description>CCDC CRITICAL: User added to Administrators group (Windows)</description>
+    <mitre>
+      <id>T1078.003</id>
+    </mitre>
+    <group>account_changed,privilege_escalation,windows,</group>
+  </rule>
+
+  <!-- Password Changed -->
+  <rule id="100014" level="6">
+    <if_sid>5555</if_sid>
+    <description>CCDC: Password changed (Linux)</description>
+    <group>account_changed,password_changed,</group>
+  </rule>
+
+  <!-- Sudoers File Modified -->
+  <rule id="100015" level="12">
+    <if_sid>550,554</if_sid>
+    <match>/etc/sudoers|/etc/sudoers.d</match>
+    <description>CCDC CRITICAL: Sudoers file modified</description>
+    <mitre>
+      <id>T1548.003</id>
+    </mitre>
+    <group>config_changed,privilege_escalation,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- PERSISTENCE ALERTS -->
+  <!-- ============================================================ -->
+
+  <!-- Cron Job Created/Modified -->
+  <rule id="100020" level="10">
+    <if_sid>2830,2831</if_sid>
+    <description>CCDC CRITICAL: Cron job created or modified</description>
+    <mitre>
+      <id>T1053.003</id>
+    </mitre>
+    <group>config_changed,persistence,</group>
+  </rule>
+
+  <!-- Crontab File Modified via FIM -->
+  <rule id="100021" level="10">
+    <if_sid>550,554</if_sid>
+    <match>/etc/crontab|/etc/cron.d|/var/spool/cron</match>
+    <description>CCDC CRITICAL: Cron configuration modified (FIM)</description>
+    <mitre>
+      <id>T1053.003</id>
+    </mitre>
+    <group>syscheck,persistence,</group>
+  </rule>
+
+  <!-- Systemd Service Created/Modified -->
+  <rule id="100022" level="10">
+    <if_sid>550,554</if_sid>
+    <match>/etc/systemd/system|/lib/systemd/system</match>
+    <description>CCDC CRITICAL: Systemd service file created or modified</description>
+    <mitre>
+      <id>T1543.002</id>
+    </mitre>
+    <group>syscheck,persistence,</group>
+  </rule>
+
+  <!-- Windows Scheduled Task Created (EventCode 106) -->
+  <rule id="100023" level="10">
+    <if_sid>60015</if_sid>
+    <field name="win.system.eventID">106</field>
+    <description>CCDC CRITICAL: Windows scheduled task created</description>
+    <mitre>
+      <id>T1053.005</id>
+    </mitre>
+    <group>persistence,windows,</group>
+  </rule>
+
+  <!-- Windows Service Installed (EventCode 7045) -->
+  <rule id="100024" level="10">
+    <if_sid>60009</if_sid>
+    <field name="win.system.eventID">7045</field>
+    <description>CCDC CRITICAL: New Windows service installed</description>
+    <mitre>
+      <id>T1543.003</id>
+    </mitre>
+    <group>persistence,windows,</group>
+  </rule>
+
+  <!-- SSH Config Modified -->
+  <rule id="100025" level="10">
+    <if_sid>550,554</if_sid>
+    <match>/etc/ssh/sshd_config|/etc/ssh/ssh_config</match>
+    <description>CCDC CRITICAL: SSH configuration modified</description>
+    <mitre>
+      <id>T1021.004</id>
+    </mitre>
+    <group>syscheck,config_changed,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- NETWORK ALERTS -->
+  <!-- ============================================================ -->
+
+  <!-- Reverse Shell Ports (4444, 5555, 6666, 1234, 1337) -->
+  <rule id="100030" level="12">
+    <if_sid>5101,5102</if_sid>
+    <match>:4444|:5555|:6666|:1234|:1337</match>
+    <description>CCDC CRITICAL: Connection to common reverse shell port detected</description>
+    <mitre>
+      <id>T1059.004</id>
+    </mitre>
+    <group>network,reverse_shell,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- PROCESS/EXECUTION ALERTS -->
+  <!-- ============================================================ -->
+
+  <!-- Suspicious Process - netcat -->
+  <rule id="100040" level="10">
+    <if_sid>80700,80701</if_sid>
+    <match>nc |ncat |netcat </match>
+    <description>CCDC: Netcat execution detected</description>
+    <mitre>
+      <id>T1059</id>
+    </mitre>
+    <group>process_monitor,suspicious_process,</group>
+  </rule>
+
+  <!-- Suspicious Process - wget/curl with execution -->
+  <rule id="100041" level="8">
+    <if_sid>80700,80701</if_sid>
+    <match>wget.*\|.*sh|curl.*\|.*sh|wget.*\|.*bash|curl.*\|.*bash</match>
+    <description>CCDC: Download and execute pattern detected (wget/curl piped to shell)</description>
+    <mitre>
+      <id>T1105</id>
+    </mitre>
+    <group>process_monitor,suspicious_process,</group>
+  </rule>
+
+  <!-- Suspicious Process - bash reverse shell -->
+  <rule id="100042" level="12">
+    <if_sid>80700,80701</if_sid>
+    <match>bash -i|/dev/tcp/|/dev/udp/</match>
+    <description>CCDC CRITICAL: Bash reverse shell pattern detected</description>
+    <mitre>
+      <id>T1059.004</id>
+    </mitre>
+    <group>process_monitor,reverse_shell,</group>
+  </rule>
+
+  <!-- PowerShell Suspicious Activity - Encoded Command -->
+  <rule id="100043" level="10">
+    <if_sid>91802,91803</if_sid>
+    <match>-enc |-EncodedCommand |FromBase64String</match>
+    <description>CCDC CRITICAL: Encoded PowerShell command detected</description>
+    <mitre>
+      <id>T1059.001</id>
+    </mitre>
+    <group>process_monitor,windows,powershell,</group>
+  </rule>
+
+  <!-- PowerShell Suspicious Activity - Download/Execute -->
+  <rule id="100044" level="10">
+    <if_sid>91802,91803</if_sid>
+    <match>Invoke-Expression|IEX |DownloadString|DownloadFile|WebClient</match>
+    <description>CCDC CRITICAL: Suspicious PowerShell download/execute detected</description>
+    <mitre>
+      <id>T1059.001</id>
+      <id>T1105</id>
+    </mitre>
+    <group>process_monitor,windows,powershell,</group>
+  </rule>
+
+  <!-- Binary Modified in System Path -->
+  <rule id="100045" level="12">
+    <if_sid>550,554</if_sid>
+    <match>/bin/|/sbin/|/usr/bin/|/usr/sbin/</match>
+    <description>CCDC CRITICAL: Binary in system path created or modified</description>
+    <mitre>
+      <id>T1036</id>
+    </mitre>
+    <group>syscheck,binary_modified,</group>
+  </rule>
+
+  <!-- SUID Binary Created -->
+  <rule id="100046" level="12">
+    <if_sid>550,554</if_sid>
+    <field name="syscheck.perm_after">s</field>
+    <description>CCDC CRITICAL: SUID binary created or modified</description>
+    <mitre>
+      <id>T1548.001</id>
+    </mitre>
+    <group>syscheck,privilege_escalation,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- WEB SERVER ALERTS -->
+  <!-- ============================================================ -->
+
+  <!-- Web Shell Indicators -->
+  <rule id="100050" level="12">
+    <if_sid>31100,31101</if_sid>
+    <url>cmd=|shell=|c99|r57|phpinfo|eval(|system(|passthru(</url>
+    <description>CCDC CRITICAL: Possible web shell access detected</description>
+    <mitre>
+      <id>T1505.003</id>
+    </mitre>
+    <group>web,attack,webshell,</group>
+  </rule>
+
+  <!-- SQL Injection Attempt -->
+  <rule id="100051" level="8">
+    <if_sid>31100,31101</if_sid>
+    <url>UNION|SELECT|OR%201=1|'%20OR%20'|;DROP|--</url>
+    <description>CCDC: Possible SQL injection attempt detected</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>web,attack,sqli,</group>
+  </rule>
+
+  <!-- Directory Traversal Attempt -->
+  <rule id="100052" level="8">
+    <if_sid>31100,31101</if_sid>
+    <url>../|%2e%2e|..%2f|%2e%2e%2f</url>
+    <description>CCDC: Directory traversal attempt detected</description>
+    <mitre>
+      <id>T1083</id>
+    </mitre>
+    <group>web,attack,lfi,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- DATABASE ALERTS -->
+  <!-- ============================================================ -->
+
+  <!-- Database Authentication Failure -->
+  <rule id="100060" level="6">
+    <decoded_as>mysql_log</decoded_as>
+    <match>Access denied for user</match>
+    <description>CCDC: Database authentication failure</description>
+    <group>database,authentication_failures,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- MAIL SERVER ALERTS -->
+  <!-- ============================================================ -->
+
+  <!-- Mail Server Auth Failure -->
+  <rule id="100070" level="6">
+    <if_sid>3301,3351</if_sid>
+    <match>authentication failed|auth failed|SASL LOGIN authentication failed</match>
+    <description>CCDC: Mail server authentication failure</description>
+    <group>mail,authentication_failures,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- SYSTEM ALERTS -->
+  <!-- ============================================================ -->
+
+  <!-- Kernel Module Loaded -->
+  <rule id="100080" level="10">
+    <if_sid>80700,80701</if_sid>
+    <match>insmod |modprobe </match>
+    <description>CCDC CRITICAL: Kernel module loaded</description>
+    <mitre>
+      <id>T1547.006</id>
+    </mitre>
+    <group>system,kernel_module,</group>
+  </rule>
+
+  <!-- Firewall Rule Changed - iptables -->
+  <rule id="100081" level="8">
+    <if_sid>80700,80701</if_sid>
+    <match>iptables.*-A|iptables.*-I|iptables.*-D|iptables.*-F</match>
+    <description>CCDC: Firewall rule modified (iptables)</description>
+    <mitre>
+      <id>T1562.004</id>
+    </mitre>
+    <group>system,firewall_changed,</group>
+  </rule>
+
+  <!-- Windows Security Log Cleared (EventCode 1102) -->
+  <rule id="100082" level="12">
+    <if_sid>60011</if_sid>
+    <field name="win.system.eventID">1102</field>
+    <description>CCDC CRITICAL: Windows Security log cleared</description>
+    <mitre>
+      <id>T1070.001</id>
+    </mitre>
+    <group>system,log_cleared,windows,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- FAIL2BAN ALERTS -->
+  <!-- ============================================================ -->
+
+  <!-- Fail2Ban IP Banned -->
+  <rule id="100090" level="6">
+    <decoded_as>fail2ban</decoded_as>
+    <match>Ban </match>
+    <description>CCDC: Fail2ban banned an IP address</description>
+    <group>ids,fail2ban,</group>
+  </rule>
+
+</group>

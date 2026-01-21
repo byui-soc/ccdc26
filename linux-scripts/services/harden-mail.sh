@@ -51,9 +51,12 @@ harden_postfix() {
     postconf -e "biff = no"
     postconf -e "append_dot_mydomain = no"
     
-    # Disable open relay
-    postconf -e "mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128"
+    # Disable open relay but allow competition networks
+    # CCDC NOTE: Scoring engine sends mail from external IPs!
+    # Include the internal competition networks to allow scoring
+    postconf -e "mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128 172.20.0.0/16 172.25.0.0/16 172.16.0.0/16 172.31.0.0/16"
     postconf -e "relay_domains ="
+    info "NOTE: mynetworks includes competition subnets (172.x.x.x) for scoring"
     
     # SMTP restrictions
     postconf -e "smtpd_helo_required = yes"
@@ -132,7 +135,8 @@ protocols = imap lmtp
 # listen = 127.0.0.1, ::1
 
 # SSL/TLS
-ssl = required
+# CCDC NOTE: Set to 'yes' instead of 'required' in case scoring uses plaintext
+ssl = yes
 ssl_min_protocol = TLSv1.2
 ssl_cipher_list = ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384
 
