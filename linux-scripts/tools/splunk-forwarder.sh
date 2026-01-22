@@ -1,8 +1,9 @@
 #!/bin/bash
 # CCDC26 Linux Toolkit - Splunk Universal Forwarder Setup
-# Forwards logs to the existing competition Splunk server as backup SIEM
+# Forwards logs to the competition Splunk server (Oracle Linux 9.2, Splunk 10.0.2)
 #
 # Competition Splunk Server: 172.20.242.20:9997
+# Run this on CLIENT machines (Ubuntu Ecom, Fedora Webmail, etc.) - NOT on the Splunk server
 
 source "$(dirname "$0")/../utils/common.sh"
 require_root
@@ -12,14 +13,15 @@ header "Splunk Universal Forwarder Setup"
 # CONFIGURATION - Competition Splunk Server
 SPLUNK_SERVER="172.20.242.20"
 SPLUNK_PORT="9997"
-SPLUNK_VERSION="9.1.2"
+SPLUNK_VERSION="10.2.0"
+SPLUNK_BUILD="d749cb17ea65"
 SPLUNK_HOME="/opt/splunkforwarder"
 SPLUNK_USER="splunkfwd"
 
-# Download URLs (may need to update for actual competition)
-SPLUNK_DEB_URL="https://download.splunk.com/products/universalforwarder/releases/${SPLUNK_VERSION}/linux/splunkforwarder-${SPLUNK_VERSION}-linux-2.6-amd64.deb"
-SPLUNK_RPM_URL="https://download.splunk.com/products/universalforwarder/releases/${SPLUNK_VERSION}/linux/splunkforwarder-${SPLUNK_VERSION}-linux-2.6-x86_64.rpm"
-SPLUNK_TGZ_URL="https://download.splunk.com/products/universalforwarder/releases/${SPLUNK_VERSION}/linux/splunkforwarder-${SPLUNK_VERSION}-Linux-x86_64.tgz"
+# Download URLs with build hash (verified working without authentication)
+SPLUNK_DEB_URL="https://download.splunk.com/products/universalforwarder/releases/${SPLUNK_VERSION}/linux/splunkforwarder-${SPLUNK_VERSION}-${SPLUNK_BUILD}-linux-amd64.deb"
+SPLUNK_RPM_URL="https://download.splunk.com/products/universalforwarder/releases/${SPLUNK_VERSION}/linux/splunkforwarder-${SPLUNK_VERSION}-${SPLUNK_BUILD}-linux-amd64.rpm"
+SPLUNK_TGZ_URL="https://download.splunk.com/products/universalforwarder/releases/${SPLUNK_VERSION}/linux/splunkforwarder-${SPLUNK_VERSION}-${SPLUNK_BUILD}-linux-amd64.tgz"
 
 check_installed() {
     if [[ -d "$SPLUNK_HOME" ]] && [[ -f "$SPLUNK_HOME/bin/splunk" ]]; then
@@ -52,6 +54,12 @@ install_forwarder() {
                 }
             fi
             dpkg -i splunkforwarder.deb
+            # Verify installation
+            if [[ ! -f "$SPLUNK_HOME/bin/splunk" ]]; then
+                error "Splunk binary not found after dpkg installation - installation failed"
+                rm -rf "$tmp_dir"
+                return 1
+            fi
             ;;
         rhel)
             info "Downloading Splunk UF for RHEL/CentOS..."
@@ -69,10 +77,17 @@ install_forwarder() {
                 }
             fi
             rpm -i splunkforwarder.rpm
+            # Verify installation
+            if [[ ! -f "$SPLUNK_HOME/bin/splunk" ]]; then
+                error "Splunk binary not found after rpm installation - installation failed"
+                rm -rf "$tmp_dir"
+                return 1
+            fi
             ;;
         *)
             info "Downloading Splunk UF tarball..."
             manual_install
+            return $?
             ;;
     esac
     
@@ -87,17 +102,32 @@ manual_install() {
     cd "$tmp_dir"
     
     if command -v wget &>/dev/null; then
-        wget -q "$SPLUNK_TGZ_URL" -O splunkforwarder.tgz
+        wget -q "$SPLUNK_TGZ_URL" -O splunkforwarder.tgz || {
+            error "Failed to download Splunk UF tarball"
+            rm -rf "$tmp_dir"
+            return 1
+        }
     else
-        curl -sL "$SPLUNK_TGZ_URL" -o splunkforwarder.tgz
+        curl -sL "$SPLUNK_TGZ_URL" -o splunkforwarder.tgz || {
+            error "Failed to download Splunk UF tarball"
+            rm -rf "$tmp_dir"
+            return 1
+        }
     fi
     
     if [[ -f splunkforwarder.tgz ]]; then
         tar -xzf splunkforwarder.tgz -C /opt/
+        # Verify installation
+        if [[ ! -f "$SPLUNK_HOME/bin/splunk" ]]; then
+            error "Splunk binary not found after tarball extraction - installation failed"
+            rm -rf "$tmp_dir"
+            return 1
+        fi
         success "Splunk UF extracted to /opt/splunkforwarder"
     else
         error "Failed to download Splunk UF"
-        exit 1
+        rm -rf "$tmp_dir"
+        return 1
     fi
     
     rm -rf "$tmp_dir"
@@ -135,22 +165,22 @@ host = $(hostname)
 [monitor:///var/log/auth.log]
 disabled = false
 sourcetype = linux_secure
-index = security
+index = linux-security
 
 [monitor:///var/log/secure]
 disabled = false
 sourcetype = linux_secure
-index = security
+index = linux-security
 
 [monitor:///var/log/audit/audit.log]
 disabled = false
 sourcetype = linux_audit
-index = security
+index = linux-security
 
 [monitor:///var/log/fail2ban.log]
 disabled = false
 sourcetype = fail2ban
-index = security
+index = linux-security
 
 # =============================================================================
 # SYSTEM LOGS
@@ -158,22 +188,22 @@ index = security
 [monitor:///var/log/syslog]
 disabled = false
 sourcetype = syslog
-index = os
+index = linux-os
 
 [monitor:///var/log/messages]
 disabled = false
 sourcetype = syslog
-index = os
+index = linux-os
 
 [monitor:///var/log/kern.log]
 disabled = false
 sourcetype = linux_kernel
-index = os
+index = linux-os
 
 [monitor:///var/log/cron*]
 disabled = false
 sourcetype = cron
-index = os
+index = linux-os
 
 # =============================================================================
 # WEB SERVER LOGS
@@ -181,32 +211,32 @@ index = os
 [monitor:///var/log/apache2/*access*.log]
 disabled = false
 sourcetype = access_combined
-index = web
+index = linux-web
 
 [monitor:///var/log/apache2/*error*.log]
 disabled = false
 sourcetype = apache_error
-index = web
+index = linux-web
 
 [monitor:///var/log/httpd/*access*.log]
 disabled = false
 sourcetype = access_combined
-index = web
+index = linux-web
 
 [monitor:///var/log/httpd/*error*.log]
 disabled = false
 sourcetype = apache_error
-index = web
+index = linux-web
 
 [monitor:///var/log/nginx/access.log]
 disabled = false
 sourcetype = access_combined
-index = web
+index = linux-web
 
 [monitor:///var/log/nginx/error.log]
 disabled = false
 sourcetype = nginx_error
-index = web
+index = linux-web
 
 # =============================================================================
 # DATABASE LOGS
@@ -214,17 +244,17 @@ index = web
 [monitor:///var/log/mysql/*.log]
 disabled = false
 sourcetype = mysql_error
-index = database
+index = linux-database
 
 [monitor:///var/log/mariadb/*.log]
 disabled = false
 sourcetype = mysql_error
-index = database
+index = linux-database
 
 [monitor:///var/log/postgresql/*.log]
 disabled = false
 sourcetype = postgresql
-index = database
+index = linux-database
 
 # =============================================================================
 # MAIL LOGS
@@ -232,12 +262,12 @@ index = database
 [monitor:///var/log/mail.log]
 disabled = false
 sourcetype = sendmail
-index = mail
+index = linux-mail
 
 [monitor:///var/log/maillog]
 disabled = false
 sourcetype = sendmail
-index = mail
+index = linux-mail
 
 # =============================================================================
 # DNS LOGS
@@ -245,12 +275,12 @@ index = mail
 [monitor:///var/log/named/*.log]
 disabled = false
 sourcetype = named
-index = dns
+index = linux-dns
 
 [monitor:///var/log/bind/*.log]
 disabled = false
 sourcetype = named
-index = dns
+index = linux-dns
 
 # =============================================================================
 # FTP LOGS
@@ -258,12 +288,12 @@ index = dns
 [monitor:///var/log/vsftpd.log]
 disabled = false
 sourcetype = vsftpd
-index = ftp
+index = linux-ftp
 
 [monitor:///var/log/proftpd/*.log]
 disabled = false
 sourcetype = proftpd
-index = ftp
+index = linux-ftp
 EOF
 
     # Set proper permissions
