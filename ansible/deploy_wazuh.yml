@@ -107,10 +107,8 @@
         group: wazuh
         mode: '0640'
         backup: yes
-      vars:
-        manager_ip: "{{ wazuh_manager }}"
-        agent_group: "{{ wazuh_agent_group }}"
       when: ansible_os_family in ['Debian', 'RedHat']
+      ignore_errors: yes
 
     # Registration
     - name: Check if agent is registered
