@@ -28,8 +28,6 @@ ansible/
 │   └── csv2inv.py              # CSV to inventory converter
 ├── roles/
 │   └── gather/                 # Host fact gathering role
-├── templates/
-│   └── ossec-linux.conf.j2     # Wazuh agent config template
 ├── inventory.ini               # Competition hosts (PRE-CONFIGURED!)
 ├── vars.yml                    # Competition variables
 ├── change_all_passwords.yml    # Mass password reset (RUN FIRST!)

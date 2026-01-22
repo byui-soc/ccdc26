@@ -474,9 +474,9 @@ sudo systemctl restart apache2
 
 ## 🔗 RELATED DOCUMENTATION
 
-- Full hardening guide: `APPLICATION-FINDINGS.md`
+- Competition quick reference: `QUICKREF.md`
 - Hardening script: `linux-scripts/service-hardening/harden-opencart.sh`
-- Game start procedures: `GAME-START-SCRIPT.md`
+- Main documentation: `README.md`
 
 ---
 
