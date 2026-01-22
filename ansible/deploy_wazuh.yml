@@ -29,13 +29,57 @@
         msg: "wazuh_manager must be set! Use -e 'wazuh_manager=IP'"
       when: manager_ip == 'CHANGE_ME'
 
-    - name: Detect OS family
+    - name: Detect OS distribution and family
       set_fact:
-        os_family: "{{ ansible_os_family | lower }}"
+        os_distribution: "{{ ansible_distribution | lower | default('unknown') }}"
+        os_family: "{{ ansible_os_family | lower | default('unknown') }}"
+        python_interpreter: "{{ ansible_python_interpreter | default('/usr/bin/python3') }}"
+      changed_when: false
+
+    - name: Handle Oracle Linux as RHEL family
+      set_fact:
+        os_family: "redhat"
+      when: 
+        - os_distribution == 'oracle linux' or os_distribution == 'ol'
+        - os_family != 'redhat'
+
+    - name: Verify Python interpreter exists
+      stat:
+        path: "{{ python_interpreter }}"
+      register: python_check
+      changed_when: false
+
+    - name: Find alternative Python interpreter
+      shell: |
+        for py in python3 python /usr/bin/python3 /usr/bin/python /usr/libexec/platform-python; do
+          if command -v $py >/dev/null 2>&1; then
+            echo $py
+            exit 0
+          fi
+        done
+        echo "python3"
+      register: python_fallback
+      changed_when: false
+      when: not python_check.stat.exists
+      ignore_errors: yes
+
+    - name: Set Python interpreter from fallback
+      set_fact:
+        python_interpreter: "{{ python_fallback.stdout | default('/usr/bin/python3') }}"
+      when: not python_check.stat.exists
+
+    - name: Display detected OS information
+      debug:
+        msg: |
+          OS Distribution: {{ os_distribution }}
+          OS Family: {{ os_family }}
+          Python Interpreter: {{ python_interpreter }}
+      changed_when: false
 
     # Debian/Ubuntu Installation
     - name: Add Wazuh GPG key (Debian/Ubuntu)
-      when: os_family == 'debian'
+      when: 
+        - os_family == 'debian' or os_distribution in ['ubuntu', 'debian']
       block:
         - name: Install prerequisites
           apt:
@@ -69,9 +113,10 @@
           environment:
             WAZUH_MANAGER: "{{ manager_ip }}"
 
-    # RHEL/CentOS Installation
-    - name: Add Wazuh repository (RHEL/CentOS)
-      when: os_family == 'redhat'
+    # RHEL/CentOS/Oracle Linux Installation
+    - name: Add Wazuh repository (RHEL/CentOS/Oracle Linux)
+      when: 
+        - os_family == 'redhat' or os_distribution in ['centos', 'rhel', 'red hat', 'oracle linux', 'ol', 'rocky', 'almalinux', 'fedora']
       block:
         - name: Import Wazuh GPG key
           rpm_key:
@@ -91,12 +136,25 @@
               protect=1
             mode: '0644'
 
-        - name: Install Wazuh agent
+        - name: Install Wazuh agent (RHEL/CentOS/Oracle)
           yum:
             name: wazuh-agent
             state: present
           environment:
             WAZUH_MANAGER: "{{ manager_ip }}"
+          vars:
+            ansible_python_interpreter: "{{ python_interpreter }}"
+          when: os_distribution not in ['fedora']
+
+        - name: Install Wazuh agent (Fedora)
+          dnf:
+            name: wazuh-agent
+            state: present
+          environment:
+            WAZUH_MANAGER: "{{ manager_ip }}"
+          vars:
+            ansible_python_interpreter: "{{ python_interpreter }}"
+          when: os_distribution == 'fedora'
 
     # Configuration (all Linux)
     - name: Configure Wazuh agent
@@ -235,8 +293,11 @@
               <log_format>json</log_format>
             </logging>
           </ossec_config>
-      when: ansible_os_family in ['Debian', 'RedHat']
+      when: 
+        - os_family in ['debian', 'redhat'] or os_distribution in ['ubuntu', 'debian', 'centos', 'rhel', 'red hat', 'oracle linux', 'ol', 'rocky', 'almalinux', 'fedora']
       ignore_errors: yes
+      vars:
+        ansible_python_interpreter: "{{ python_interpreter }}"
 
     # Registration
     - name: Check if agent is registered
@@ -244,12 +305,32 @@
         path: /var/ossec/etc/client.keys
       register: client_keys
 
+    - name: Test connectivity to Wazuh manager
+      shell: |
+        timeout 5 bash -c "echo > /dev/tcp/{{ manager_ip }}/1514" 2>/dev/null || nc -zv {{ manager_ip }} 1514 2>&1 | head -1
+      register: connectivity_test
+      changed_when: false
+      ignore_errors: yes
+      vars:
+        ansible_python_interpreter: "{{ python_interpreter }}"
+
+    - name: Warn if manager connectivity fails
+      debug:
+        msg: "WARNING: Cannot reach Wazuh manager at {{ manager_ip }}:1514. Check firewall rules and network connectivity."
+      when: connectivity_test.rc != 0
+      vars:
+        ansible_python_interpreter: "{{ python_interpreter }}"
+
     - name: Register agent with manager
       shell: |
         /var/ossec/bin/agent-auth -m {{ manager_ip }} -A {{ ansible_hostname }} {% if reg_password %}-P {{ reg_password }}{% endif %} {% if agent_group != 'default' %}-G {{ agent_group }}{% endif %}
-      when: not client_keys.stat.exists or client_keys.stat.size == 0
+      when: 
+        - not client_keys.stat.exists or client_keys.stat.size == 0
+        - connectivity_test.rc == 0
       register: agent_auth
       ignore_errors: yes
+      vars:
+        ansible_python_interpreter: "{{ python_interpreter }}"
 
     - name: Display registration result
       debug:
@@ -257,10 +338,22 @@
       when: agent_auth is defined and agent_auth.rc is defined
 
     # Service management
-    - name: Disable Wazuh repo updates (lock version)
+    - name: Disable Wazuh repo updates (lock version - Debian/Ubuntu)
       shell: echo "wazuh-agent hold" | dpkg --set-selections
-      when: os_family == 'debian'
+      when: os_family == 'debian' or os_distribution in ['ubuntu', 'debian']
       ignore_errors: yes
+      vars:
+        ansible_python_interpreter: "{{ python_interpreter }}"
+
+    - name: Disable Wazuh repo updates (lock version - RHEL/CentOS/Oracle)
+      shell: |
+        if [ -f /etc/yum.repos.d/wazuh.repo ]; then
+          sed -i 's/^enabled=1/enabled=0/' /etc/yum.repos.d/wazuh.repo
+        fi
+      when: os_family == 'redhat' or os_distribution in ['centos', 'rhel', 'red hat', 'oracle linux', 'ol', 'rocky', 'almalinux']
+      ignore_errors: yes
+      vars:
+        ansible_python_interpreter: "{{ python_interpreter }}"
 
     - name: Enable and start Wazuh agent service
       systemd:
@@ -299,6 +392,26 @@
         msg: "wazuh_manager must be set! Use -e 'wazuh_manager=IP'"
       when: manager_ip == 'CHANGE_ME'
 
+    - name: Test connectivity to Wazuh manager (Windows)
+      win_shell: |
+        $tcpClient = New-Object System.Net.Sockets.TcpClient
+        try {
+          $tcpClient.Connect("{{ manager_ip }}", 1514)
+          $tcpClient.Close()
+          Write-Output "SUCCESS"
+        } catch {
+          Write-Output "FAILED: $_"
+          exit 1
+        }
+      register: win_connectivity_test
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Warn if manager connectivity fails (Windows)
+      debug:
+        msg: "WARNING: Cannot reach Wazuh manager at {{ manager_ip }}:1514. Check firewall rules and network connectivity. Ensure Cisco FTD allows traffic from Windows subnet to Linux subnet."
+      when: win_connectivity_test.rc != 0
+
     - name: Check if Wazuh agent is already installed
       win_stat:
         path: "C:\\Program Files (x86)\\ossec-agent\\wazuh-agent.exe"
@@ -318,8 +431,16 @@
           WAZUH_AGENT_GROUP={{ agent_group }}
           {% if reg_password %}WAZUH_REGISTRATION_PASSWORD={{ reg_password }}{% endif %}
         state: present
-      when: not wazuh_installed.stat.exists
+      when: 
+        - not wazuh_installed.stat.exists
+        - win_connectivity_test.rc == 0
       register: wazuh_install
+      ignore_errors: yes
+
+    - name: Display installation result
+      debug:
+        msg: "Wazuh agent installation: {{ 'successful' if (wazuh_install.rc | default(1)) == 0 else 'failed - check logs' }}"
+      when: wazuh_install is defined
 
     - name: Remove installer
       win_file:
@@ -357,15 +478,43 @@
         name: WazuhSvc
         start_mode: auto
         state: started
+      ignore_errors: yes
+      when: wazuh_installed.stat.exists or (wazuh_install is defined and wazuh_install.rc == 0)
 
     - name: Get Wazuh service status
       win_shell: |
         $svc = Get-Service -Name WazuhSvc -ErrorAction SilentlyContinue
-        if ($svc) { $svc.Status } else { "Not installed" }
+        if ($svc) { 
+          Write-Output "Status: $($svc.Status)"
+          Write-Output "StartType: $($svc.StartType)"
+        } else { 
+          Write-Output "Not installed" 
+        }
       register: wazuh_service
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Check agent connection to manager
+      win_shell: |
+        if (Test-Path "C:\Program Files (x86)\ossec-agent\ossec.log") {
+          $lastLines = Get-Content "C:\Program Files (x86)\ossec-agent\ossec.log" -Tail 10
+          $connected = $lastLines | Select-String -Pattern "Connected|Successfully"
+          if ($connected) {
+            Write-Output "Agent appears to be connected to manager"
+          } else {
+            Write-Output "Agent may not be connected - check logs"
+          }
+        } else {
+          Write-Output "Log file not found"
+        }
+      register: agent_connection_check
+      changed_when: false
+      ignore_errors: yes
 
     - name: Display Wazuh agent status
       debug:
         msg: |
           Wazuh Agent Service: {{ wazuh_service.stdout | trim }}
           Manager: {{ manager_ip }}
+          Connectivity Test: {{ 'PASSED' if win_connectivity_test.rc == 0 else 'FAILED' }}
+          Connection Status: {{ agent_connection_check.stdout | default('Unknown') }}

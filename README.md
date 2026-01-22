@@ -12,11 +12,34 @@ Install on ONE machine (your Ansible controller):
 
 ```bash
 # Fedora/RHEL
-sudo dnf install -y git python3-pip && pip3 install ansible pywinrm
+sudo dnf install -y git python3-pip sshpass && pip3 install ansible pywinrm
 
 # Ubuntu/Debian
-sudo apt install -y git python3-pip && pip3 install ansible pywinrm
+sudo apt install -y git python3-pip sshpass && pip3 install ansible pywinrm
 ```
+
+### Network Requirements
+
+**IMPORTANT**: For Ansible to manage Windows hosts from Linux, you must configure:
+
+1. **Windows Firewall** (on each Windows host):
+   ```powershell
+   # Run as Administrator on each Windows machine:
+   cd C:\ccdc26\windows-scripts
+   .\Setup-WinRM-Ansible.ps1
+   ```
+   This allows Linux subnet (172.20.242.0/24) to connect via WinRM (port 5985).
+
+2. **Cisco FTD Firewall** (manual configuration required):
+   - Allow traffic from Linux subnet (172.20.242.0/24) to Windows subnet (172.20.240.0/24)
+   - Required ports: TCP 5985 (WinRM), ICMP (ping)
+   - Access FTD via browser: https://172.20.240.200 from Windows hosts
+
+3. **Test connectivity**:
+   ```bash
+   # From Ansible controller:
+   ansible-playbook -i ansible/inventory.ini ansible/test-network-connectivity.yml
+   ```
 
 ---
 
@@ -83,6 +106,11 @@ Your Machine (Controller)          Other Machines (Targets)
 - **Controller**: The machine where you run `./deploy.sh` and select Ansible options
 - **Targets**: All other machines listed in `ansible/inventory.ini`
 - Ansible connects via SSH (Linux) or WinRM (Windows) on the internal network
+
+**Network Architecture**:
+- Linux Zone: 172.20.242.0/24 (via Palo Alto firewall)
+- Windows Zone: 172.20.240.0/24 (via Cisco FTD firewall)
+- Inter-zone connectivity requires firewall rules (see Network Requirements above)
 
 ---
 

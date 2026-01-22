@@ -124,8 +124,8 @@ try {
     Write-Host "  You may need to manually configure firewall rules" -ForegroundColor Yellow
 }
 
-# 6. Verify configuration
-Write-Host "`n[6/6] Verifying configuration..." -ForegroundColor Yellow
+# 6. Verify configuration and test connectivity
+Write-Host "`n[6/7] Verifying configuration..." -ForegroundColor Yellow
 try {
     $winrmConfig = winrm get winrm/config
     Write-Host "  ✓ WinRM configuration retrieved successfully" -ForegroundColor Green
@@ -137,6 +137,67 @@ try {
     }
 } catch {
     Write-Warning "Verification warning: $_"
+}
+
+# 7. Test network connectivity
+Write-Host "`n[7/7] Testing network connectivity..." -ForegroundColor Yellow
+function Test-NetworkConnectivity {
+    param(
+        [string]$TargetSubnet,
+        [string]$TestPort = 5985
+    )
+    
+    Write-Host "  Testing connectivity from Linux subnet ($TargetSubnet)..." -ForegroundColor Gray
+    
+    # Test if we can receive connections on WinRM port
+    $listener = Get-NetTCPConnection -LocalPort $TestPort -State Listen -ErrorAction SilentlyContinue
+    if ($listener) {
+        Write-Host "  ✓ WinRM port $TestPort is listening" -ForegroundColor Green
+    } else {
+        Write-Host "  ✗ WinRM port $TestPort is not listening" -ForegroundColor Red
+        return $false
+    }
+    
+    # Check firewall rules
+    $firewallRule = Get-NetFirewallRule -Name "CCDC-WinRM-Ansible" -ErrorAction SilentlyContinue
+    if ($firewallRule -and $firewallRule.Enabled) {
+        Write-Host "  ✓ Firewall rule 'CCDC-WinRM-Ansible' is enabled" -ForegroundColor Green
+        
+        # Check if rule allows the management subnet
+        $ruleAddress = (Get-NetFirewallAddressFilter -AssociatedNetFirewallRule $firewallRule).RemoteAddress
+        if ($ruleAddress -contains $TargetSubnet -or $ruleAddress -eq "*") {
+            Write-Host "  ✓ Firewall rule allows $TargetSubnet" -ForegroundColor Green
+        } else {
+            Write-Host "  ⚠ Firewall rule may not allow $TargetSubnet (current: $ruleAddress)" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "  ✗ Firewall rule 'CCDC-WinRM-Ansible' not found or disabled" -ForegroundColor Red
+        return $false
+    }
+    
+    # Test if we can reach a Linux host (if provided)
+    if ($ControllerIP) {
+        Write-Host "  Testing connectivity to controller $ControllerIP..." -ForegroundColor Gray
+        try {
+            $ping = Test-Connection -ComputerName $ControllerIP -Count 1 -Quiet -ErrorAction SilentlyContinue
+            if ($ping) {
+                Write-Host "  ✓ Can ping controller $ControllerIP" -ForegroundColor Green
+            } else {
+                Write-Host "  ⚠ Cannot ping controller $ControllerIP (may be blocked by firewall)" -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "  ⚠ Cannot test ping to controller: $_" -ForegroundColor Yellow
+        }
+    }
+    
+    return $true
+}
+
+$connectivityTest = Test-NetworkConnectivity -TargetSubnet $ManagementSubnet
+if (-not $connectivityTest) {
+    Write-Host "`n⚠️  WARNING: Network connectivity test failed!" -ForegroundColor Red
+    Write-Host "  This may indicate firewall or network configuration issues." -ForegroundColor Yellow
+    Write-Host "  Ensure Cisco FTD firewall allows traffic from $ManagementSubnet to this host." -ForegroundColor Yellow
 }
 
 # Summary
@@ -156,6 +217,16 @@ Write-Host "`n⚠️  SECURITY NOTE:" -ForegroundColor Red
 Write-Host "  This configuration allows unencrypted WinRM connections." -ForegroundColor Yellow
 Write-Host "  This is acceptable in a CCDC isolated network environment." -ForegroundColor Yellow
 Write-Host "  Do NOT use this configuration in production!" -ForegroundColor Yellow
+
+Write-Host "`n⚠️  IMPORTANT NETWORK REQUIREMENTS:" -ForegroundColor Yellow
+Write-Host "  1. Cisco FTD firewall must allow traffic from $ManagementSubnet to Windows subnet (172.20.240.0/24)" -ForegroundColor White
+Write-Host "  2. Windows Firewall rule created for $ManagementSubnet" -ForegroundColor White
+Write-Host "  3. WinRM service must be running (verified above)" -ForegroundColor White
+Write-Host ""
+Write-Host "  If Linux hosts cannot reach Windows hosts, check:" -ForegroundColor Yellow
+Write-Host "    - Cisco FTD firewall rules (manual configuration required)" -ForegroundColor Gray
+Write-Host "    - Windows Firewall: Get-NetFirewallRule -Name 'CCDC-WinRM-Ansible'" -ForegroundColor Gray
+Write-Host "    - Network routing: Test-NetConnection -ComputerName <linux-ip> -Port 5985" -ForegroundColor Gray
 
 Write-Host "`nTest from Ansible controller with:" -ForegroundColor White
 Write-Host "  ansible windows -i inventory.ini -m win_ping" -ForegroundColor Cyan

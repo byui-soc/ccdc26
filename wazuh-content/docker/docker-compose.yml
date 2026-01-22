@@ -10,8 +10,8 @@
 # Requirements:
 #   - Docker 20.10+
 #   - Docker Compose v2 or docker-compose v1.29+
-#   - 8GB RAM minimum (16GB recommended)
-#   - 50GB disk space
+#   - 4GB RAM minimum (8GB recommended) - Reduced for CCDC VMs
+#   - 20GB disk space
 #
 # Default Credentials:
 #   Dashboard: admin / SecretPassword
@@ -32,6 +32,14 @@ services:
     hostname: wazuh.manager
     container_name: wazuh-manager
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
     ulimits:
       memlock:
         soft: -1
@@ -81,6 +89,14 @@ services:
     hostname: wazuh.indexer
     container_name: wazuh-indexer
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.5'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
     ulimits:
       memlock:
         soft: -1
@@ -91,7 +107,7 @@ services:
     ports:
       - "9200:9200"    # Indexer API
     environment:
-      - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx1g"
       - bootstrap.memory_lock=true
       - network.host=0.0.0.0
       - node.name=wazuh.indexer
@@ -128,6 +144,14 @@ services:
     hostname: wazuh.dashboard
     container_name: wazuh-dashboard
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
     ports:
       - "443:5601"     # Dashboard HTTPS
     environment:
