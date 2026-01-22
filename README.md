@@ -45,6 +45,24 @@ sudo apt install -y git python3-pip sshpass && pip3 install ansible pywinrm
 
 ## Quick Start
 
+### Option 1: Standalone Deployment (Recommended)
+
+**On any Linux machine, deploy directly:**
+
+```bash
+# Clone and deploy in one step
+sudo ./deploy-standalone.sh --repo-url https://github.com/YOUR_REPO/ccdc26.git
+
+# Or clone manually, then run
+git clone https://github.com/YOUR_REPO/ccdc26.git /opt/ccdc26
+cd /opt/ccdc26
+sudo ./deploy.sh
+```
+
+### Option 2: Ansible Deployment (From Controller)
+
+**On Ansible controller machine:**
+
 ```bash
 # 1. Clone the repo
 git clone https://github.com/YOUR_REPO/ccdc26.git /opt/ccdc26
@@ -55,7 +73,7 @@ sudo ./deploy.sh
 
 # 3. Select an option:
 #    1) Quick Harden  - Hardens THIS machine (no passwords changed)
-#    2) Ansible       - Manage ALL machines remotely
+#    2) Ansible       - Manage ALL machines remotely (uses git clone)
 #    3) Advanced      - Individual tools and scripts
 ```
 
@@ -78,7 +96,7 @@ sudo ./deploy.sh
 | **1) Generate inventory** | Convert CSV to inventory.ini |
 | **2) Test connectivity** | Ping all machines to verify Ansible can reach them |
 | **3) Password Reset** | Change ALL passwords on ALL machines + kick active sessions |
-| **4) Deploy Hardening** | Copy scripts to all machines (optionally run them) |
+| **4) Deploy Hardening** | Clone repo to all machines via git (optionally run hardening) |
 | **5) Deploy Wazuh Agents** | Install Wazuh agent on all machines |
 | **6) Deploy Splunk Forwarders** | Install Splunk forwarder on all machines |
 | **7) Gather Facts** | Collect system info from all machines |
@@ -105,12 +123,18 @@ Your Machine (Controller)          Other Machines (Targets)
 
 - **Controller**: The machine where you run `./deploy.sh` and select Ansible options
 - **Targets**: All other machines listed in `ansible/inventory.ini`
-- Ansible connects via SSH (Linux) or WinRM (Windows) on the internal network
+- Ansible connects via SSH (Linux) or WinRM (Windows) and clones the repository via git
+- Each target machine gets a full copy of the repo, allowing standalone script execution
 
 **Network Architecture**:
 - Linux Zone: 172.20.242.0/24 (via Palo Alto firewall)
 - Windows Zone: 172.20.240.0/24 (via Cisco FTD firewall)
 - Inter-zone connectivity requires firewall rules (see Network Requirements above)
+
+**Deployment Method**:
+- Ansible uses `git clone` to deploy the repository to each target machine
+- This is faster and more reliable than copying individual files
+- Each machine can then run scripts locally without Ansible connectivity
 
 ---
 

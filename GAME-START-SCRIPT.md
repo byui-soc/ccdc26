@@ -8,50 +8,14 @@
 
 | Time | Priority | Action |
 |------|----------|--------|
-| **0:00-0:02** | 🔴 CRITICAL | Remove malware from ALL Linux machines |
-| **0:02-0:05** | 🔴 CRITICAL | Change ALL passwords |
+| **0:00-0:05** | 🔴 CRITICAL | Change ALL passwords |
 | **0:05-0:10** | 🟡 HIGH | Quick harden ALL machines |
 | **0:10-0:15** | 🟢 MEDIUM | Deploy monitoring (Wazuh/Splunk) |
 | **0:15+** | 🔵 ONGOING | Continuous monitoring + injects |
 
 ---
 
-## 🚨 MINUTE 0-2: MALWARE REMOVAL (CRITICAL)
-
-### Option A: Via Ansible (FASTEST)
-
-**Run from Ubuntu Workstation (172.20.242.38):**
-
-```bash
-cd /opt/ccdc26
-sudo ./deploy.sh
-# Select: 2 (Ansible) → 8 (Run custom playbook)
-# Enter: ansible/emergency-malware-removal.yml
-```
-
-### Option B: Manual (if Ansible not working)
-
-**SSH to EACH Linux machine and run:**
-
-```bash
-sudo systemctl stop startup_check.service
-sudo systemctl disable startup_check.service
-sudo rm -f /etc/startup_check.py /etc/systemd/system/startup_check.service
-sudo rm -f /usr/share/startup_check-installer.sh /etc/config.txt /var/log/startup_check.log
-sudo find /home -name "authorized_keys" -delete
-sudo find /root -name "authorized_keys" -delete
-sudo systemctl daemon-reload
-```
-
-**Machines to clean:**
-- ☐ Ubuntu Ecom (172.20.242.30)
-- ☐ Fedora Webmail (172.20.242.40)
-- ☐ Splunk (172.20.242.20)
-- ☐ Ubuntu Workstation (172.20.242.38 or DHCP)
-
----
-
-## 🔑 MINUTE 2-5: PASSWORD CHANGES
+## 🔑 MINUTE 0-5: PASSWORD CHANGES (CRITICAL)
 
 ### Via Ansible
 
@@ -170,13 +134,9 @@ sudo ./deploy.sh
 
 ### Every 10 Minutes
 
-**Check for malware re-creation:**
+**Check for suspicious activity:**
 
 ```bash
-# On each Linux machine:
-systemctl status startup_check.service
-ls -la /etc/startup_check.py /usr/share/startup_check-installer.sh
-
 # Check UID 0 accounts:
 awk -F: '$3 == 0 {print}' /etc/passwd
 
@@ -260,15 +220,14 @@ New-NetFirewallRule -Name "CCDC-WinRM" -DisplayName "WinRM CCDC" `
 nc -zv 172.20.240.100 5985
 ```
 
-### Malware Keeps Coming Back
+### Suspicious Activity Detected
 
-**The malware runs every 10 minutes. If it reappears:**
+**If you notice suspicious behavior:**
 
-1. Check for the config file: `cat /etc/config.txt`
-2. Check for renamed installer: `ls -la /usr/share/*.sh`
-3. Check for cron jobs: `crontab -l` and `crontab -e -u root`
-4. Check systemd timers: `systemctl list-timers`
-5. Look for other persistence: `cd /opt/ccdc26 && sudo ./deploy.sh` → 3 → 7 (Hunt for Persistence)
+1. Check for unauthorized cron jobs: `crontab -l` and `crontab -e -u root`
+2. Check systemd timers: `systemctl list-timers`
+3. Check for new services: `systemctl list-units --type=service --state=running`
+4. Hunt for persistence: `cd /opt/ccdc26 && sudo ./deploy.sh` → 3 → 7 (Hunt for Persistence)
 
 ### Services Down After Hardening
 
@@ -348,8 +307,7 @@ sudo ufw status
 
 ### T-minus 0 (DROP FLAG):
 - ☐ START TIMER
-- ☐ Run malware removal (Minute 0-2)
-- ☐ Change passwords (Minute 2-5)
+- ☐ Change passwords (Minute 0-5)
 - ☐ Quick harden (Minute 5-10)
   - ☐ Run hardening on all machines
   - ☐ **OpenCart: Login and change admin password**

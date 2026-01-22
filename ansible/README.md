@@ -104,18 +104,35 @@ ansible-playbook -i inventory.ini changepw_kick.yml
 
 ### deploy_hardening.yml
 
-**Purpose**: Deploy and run hardening scripts
+**Purpose**: Deploy repository via git clone and optionally run hardening scripts
+
+**How it works**: Uses `git clone` to deploy the full repository to each target machine. This is faster and more reliable than copying individual files.
 
 ```bash
-# Deploy to all Linux hosts
+# Deploy repository to all Linux hosts (git clone)
 ansible-playbook -i inventory.ini deploy_hardening.yml
 
-# Deploy with specific options
+# Deploy and run full hardening
 ansible-playbook -i inventory.ini deploy_hardening.yml -e "run_full=true"
 
-# Dry run (check mode)
-ansible-playbook -i inventory.ini deploy_hardening.yml --check
+# Specify custom repository URL
+ansible-playbook -i inventory.ini deploy_hardening.yml -e "repo_url=https://github.com/YOUR_REPO/ccdc26.git"
+
+# Deploy to specific hosts only
+ansible-playbook -i inventory.ini deploy_hardening.yml --limit ecom,webmail
 ```
+
+**What it does**:
+1. Installs git if not present
+2. Clones/updates repository to `/opt/ccdc26` on each Linux host
+3. Makes all scripts executable
+4. Optionally runs hardening scripts if `run_full=true`
+
+**Benefits**:
+- Faster than copying hundreds of files
+- Easy to update: just `git pull` on each host
+- Works standalone: hosts can run scripts without Ansible
+- Standard tool (git) vs custom file copying logic
 
 ### deploy_wazuh.yml
 
@@ -152,6 +169,8 @@ ansible-playbook playbook.yml -e "wazuh_manager=10.0.0.100" -e "temp_password=Ne
 Key variables:
 - `wazuh_manager`: IP of Wazuh manager
 - `toolkit_dest`: Where to deploy scripts (default: /opt/ccdc26)
+- `repo_url`: Repository URL for git clone (default: from inventory or github)
+- `repo_branch`: Branch to clone (default: main)
 - `competition_users`: List of users to create
 
 ## Requirements
@@ -168,8 +187,14 @@ pip3 install pywinrm
 
 ### Target Hosts
 
-**Linux**: SSH access with sudo
-**Windows**: WinRM enabled (port 5985)
+**Linux**: 
+- SSH access with sudo
+- Git installed (will be installed automatically if missing)
+- Python 3 (for Ansible modules)
+
+**Windows**: 
+- WinRM enabled (port 5985)
+- Git preferred (for git clone), or will use ZIP download fallback
 
 Enable WinRM on Windows:
 ```powershell
@@ -177,10 +202,42 @@ winrm quickconfig
 Enable-PSRemoting -Force
 ```
 
+## Deployment Methods
+
+### Method 1: Ansible (Recommended for Multiple Hosts)
+
+Deploy to all hosts via Ansible:
+
+```bash
+ansible-playbook -i inventory.ini deploy_hardening.yml
+```
+
+### Method 2: Standalone (When Ansible Fails)
+
+Each host can deploy itself:
+
+```bash
+# On any Linux host:
+sudo ./deploy-standalone.sh --repo-url https://github.com/YOUR_REPO/ccdc26.git
+```
+
+This clones the repo and makes scripts executable. No Ansible needed.
+
+### Method 3: Manual Git Clone
+
+```bash
+# On any Linux host:
+git clone https://github.com/YOUR_REPO/ccdc26.git /opt/ccdc26
+cd /opt/ccdc26/linux-scripts
+sudo ./hardening/full-harden.sh
+```
+
 ## Tips for Competition
 
 1. **Pre-create inventory template** with expected host ranges
 2. **Test locally first** with a VM
 3. **Run changepw_kick.yml immediately** on competition start
-4. **Use --limit** to target specific hosts: `--limit web1,db1`
+4. **Use --limit** to target specific hosts: `--limit ecom,webmail`
 5. **Use -v** for verbose output to debug issues
+6. **If Ansible fails**, use `deploy-standalone.sh` on each host directly
+7. **Update scripts easily**: After git clone, just `git pull` on each host to update

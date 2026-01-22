@@ -6,76 +6,7 @@
 
 ---
 
-## 🚨 CRITICAL FINDINGS - MALWARE DISCOVERED
-
-### 1. Startup_Check Backdoor/Worm
-
-**PRIORITY: CRITICAL - DISABLE IMMEDIATELY ON GAME START**
-
-A sophisticated persistence mechanism was discovered pre-installed on Linux systems:
-
-**Location:** `/etc/startup_check.py` with systemd service `/etc/systemd/system/startup_check.service`
-
-**Behavior:**
-- Runs every 10 minutes (600 seconds)
-- Reads configuration from `/etc/config.txt`:
-  - First line: local file to rename to `.SAVE` (e.g., `/var/lib/startup.sh`)
-  - Subsequent lines: remote machines in format `ip,username,password`
-- For each remote machine:
-  1. Attempts SSH connection (password or key-based)
-  2. Checks if `/usr/share/startup_check-installer.sh` exists on remote
-  3. If missing, copies the installer script via SFTP
-  4. Executes the installer (which recreates the malware on remote system)
-  5. Sets file permissions to make it executable
-- Renames local target file (persistence mechanism)
-- Logs to `/var/log/startup_check.log` and systemd journal with message "Startup Files Checked - Do Not Restart"
-
-**Affected Machines:**
-- Ubuntu Ecom (172.20.242.30) ✓ CONFIRMED
-- Ubuntu Workstation (172.20.242.38) ✓ CONFIRMED  
-- Fedora Webmail (172.20.242.40) - LIKELY
-
-**Config File Found on Ubuntu Ecom:**
-```
-/var/lib/startup.sh
-172.20.242.254,root,
-172.20.242.30,root,
-172.20.242.40,root,
-```
-
-**Installer Script:** `/usr/share/startup_check-installer.sh`
-- Creates the Python backdoor script
-- Creates the systemd service
-- Enables and starts the service
-
-**Immediate Actions on Game Start:**
-```bash
-# On EACH Linux machine:
-
-# 1. Stop and disable the service
-sudo systemctl stop startup_check.service
-sudo systemctl disable startup_check.service
-
-# 2. Remove malware files
-sudo rm -f /etc/startup_check.py
-sudo rm -f /etc/systemd/system/startup_check.service
-sudo rm -f /usr/share/startup_check-installer.sh
-sudo rm -f /etc/config.txt
-sudo rm -f /var/log/startup_check.log
-
-# 3. Reload systemd
-sudo systemctl daemon-reload
-
-# 4. Check for renamed files
-ls -la /var/lib/*.SAVE
-# If found, investigate before restoring
-
-# 5. Verify removal
-systemctl status startup_check.service
-```
-
-**Prevention:**
-This appears to be a pre-configured vulnerability/backdoor (not red team activity since the game hasn't started). Based on research, CCDC typically includes misconfigurations but deliberate backdoors in startup scripts are concerning. Monitor for re-creation during the competition.
+## 🔐 SSH SECURITY ISSUES
 
 ---
 
@@ -265,11 +196,10 @@ ansible windows -i ansible/inventory.ini -m win_ping
 
 **Suspicious Files Found in /home/sysadmin:**
 
-1. **`install-ssh-req.sh`** ⚠️ MALWARE-RELATED
+1. **`install-ssh-req.sh`**
    - Installs `python3-paramiko` and `openssh-server`
-   - Paramiko is the SAME library used by startup_check malware
-   - Likely used to install malware dependencies
-   - **Remove immediately on game start**
+   - Review if paramiko is needed for legitimate purposes
+   - **Review and remove if not needed**
 
 2. **`opencart-master/` directory and `master.zip`**
    - OpenCart source code  
@@ -308,7 +238,7 @@ ansible windows -i ansible/inventory.ini -m win_ping
 
 3. **Remove Suspicious Files** (Minute 8-10)
    ```bash
-   # Remove malware-related script
+   # Review and remove install-ssh-req.sh if not needed
    sudo rm /home/sysadmin/install-ssh-req.sh
    
    # Secure OpenCart source files
@@ -478,37 +408,7 @@ win11-wks ansible_host=172.20.240.100 ansible_user=userone ansible_password=!Pas
 
 ## 🚀 GAME START PRIORITY ORDER
 
-### Minute 0-2: MALWARE REMOVAL (CRITICAL)
-
-**Run on ALL Linux machines simultaneously** (use `deploy.sh` Option 2 or manually via SSH):
-
-```bash
-# Create quick removal script
-cat > /tmp/remove_malware.sh << 'EOF'
-#!/bin/bash
-systemctl stop startup_check.service 2>/dev/null
-systemctl disable startup_check.service 2>/dev/null
-rm -f /etc/startup_check.py
-rm -f /etc/systemd/system/startup_check.service
-rm -f /usr/share/startup_check-installer.sh
-rm -f /etc/config.txt
-rm -f /var/log/startup_check.log
-find /home -name "authorized_keys" -delete
-find /root -name "authorized_keys" -delete
-systemctl daemon-reload
-echo "Malware removed"
-EOF
-
-chmod +x /tmp/remove_malware.sh
-sudo /tmp/remove_malware.sh
-```
-
-**Via Ansible (if connectivity working):**
-```bash
-ansible linux -i ansible/inventory.ini -b -m shell -a "systemctl stop startup_check.service; systemctl disable startup_check.service; rm -f /etc/startup_check.py /etc/systemd/system/startup_check.service /usr/share/startup_check-installer.sh /etc/config.txt; systemctl daemon-reload"
-```
-
-### Minute 2-5: PASSWORD CHANGES
+### Minute 0-2: PASSWORD CHANGES (CRITICAL)
 
 **Change ALL passwords immediately:**
 
@@ -557,12 +457,6 @@ sudo ./deploy.sh
 
 ### Every 10 Minutes
 
-- [ ] Check for startup_check.service reappearance:
-  ```bash
-  systemctl status startup_check.service
-  ls -la /etc/startup_check.py
-  ```
-
 - [ ] Check for new UID 0 accounts:
   ```bash
   awk -F: '$3 == 0 {print}' /etc/passwd | grep -v "^root:"
@@ -595,11 +489,10 @@ sudo ./deploy.sh
 
 ### Useful Commands
 
-**Check if malware is running:**
+**Check for suspicious services:**
 ```bash
-ps aux | grep startup_check
-systemctl list-units | grep startup
-journalctl -u startup_check.service --no-pager | tail -20
+systemctl list-units --type=service --state=running
+ps aux | grep -E "python|\.py" | grep -v grep
 ```
 
 **Find all Python scripts in /etc:**
@@ -624,16 +517,10 @@ systemctl list-unit-files --type=service | grep -v "@"
    - Currently only have access to Win11 Workstation
 
 2. **What's the IP at 172.20.242.254?**
-   - Listed in malware config.txt
    - We can ping it from Ubuntu workstation
    - Unknown device (investigate further)
 
-3. **Is the startup_check malware a red team backdoor or pre-configured vuln?**
-   - If pre-configured: safe to remove immediately
-   - If red team: may reappear, need continuous monitoring
-   - Research suggests CCDC doesn't typically pre-plant active malware
-
-4. **Why can't we ping Windows machines from Linux?**
+3. **Why can't we ping Windows machines from Linux?**
    - Routing works (VyOS confirmed)
    - Likely firewall issue on Cisco FTD or Windows Firewall
    - Need to investigate before WinRM will work
@@ -652,7 +539,6 @@ systemctl list-unit-files --type=service | grep -v "@"
 
 ## ✅ COMPLETED DURING EARLY ACCESS
 
-- [x] Discovered and analyzed startup_check malware
 - [x] Verified Linux machine credentials (Ubuntu Wks, Ecom, Webmail, Palo Alto, Cisco FTD)
 - [x] Fixed Ansible sshpass dependency issue
 - [x] Identified SSH authorized_keys backdoor
@@ -661,16 +547,16 @@ systemctl list-unit-files --type=service | grep -v "@"
 - [x] Created WinRM setup script for Windows machines
 - [x] Verified VyOS routing configuration
 - [x] Updated inventory.ini with correct passwords
-- [x] Ran linuxcheck.sh on multiple machines
+- [x] Verified system configurations on multiple machines
 - [x] Enumerated users on Ubuntu Workstation
 
 ---
 
 ## 🎯 TOP PRIORITIES FOR GAME START
 
-1. **REMOVE MALWARE** - startup_check.service on all Linux machines
-2. **REMOVE SSH KEYS** - authorized_keys files on all machines
-3. **CHANGE ALL PASSWORDS** - immediately after malware removal
+1. **CHANGE ALL PASSWORDS** - immediately on game start
+2. **REMOVE SSH KEYS** - authorized_keys files on all machines (if unauthorized)
+3. **QUICK HARDEN** - Run hardening scripts on all machines
 4. **VERIFY UID 0 ACCOUNTS** - only root should have UID 0
 5. **ENABLE WINDOWS WINRM** - for Ansible management (if not done pre-game)
 

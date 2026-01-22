@@ -25,8 +25,8 @@
 
 **Suspicious Files Found in /home/sysadmin:**
 - `install-ssh-req.sh` - Script that installs python3-paramiko and openssh-server
-  - **WARNING:** Paramiko is used by the startup_check malware for SSH connections
-  - This script may be related to malware installation
+  - Review if paramiko is needed for legitimate purposes
+  - Remove if not needed
 - `opencart-master/` directory and `master.zip` - OpenCart source files
   - May be leftover from manual installation
   - Could potentially be used by red team for version information

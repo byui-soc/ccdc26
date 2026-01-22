@@ -16,48 +16,44 @@
 
   vars:
     toolkit_dest: "/opt/ccdc26"
+    repo_url: "{{ repo_url | default('https://github.com/YOUR_REPO/ccdc26.git') }}"
+    repo_branch: "{{ repo_branch | default('main') }}"
     run_full: false
     run_services: false
     run_monitoring: false
 
   tasks:
-    - name: Detect OS distribution
-      set_fact:
-        os_distribution: "{{ ansible_distribution | lower | default('unknown') }}"
-        os_family: "{{ ansible_os_family | lower | default('unknown') }}"
-      changed_when: false
+    - name: Ensure git is installed (Debian/Ubuntu)
+      apt:
+        name: git
+        state: present
+        update_cache: yes
+      when: ansible_pkg_mgr == 'apt'
 
-    - name: Create toolkit directory
-      file:
-        path: "{{ toolkit_dest }}"
-        state: directory
-        mode: '0755'
+    - name: Ensure git is installed (RHEL/CentOS/Fedora)
+      yum:
+        name: git
+        state: present
+      when: ansible_pkg_mgr == 'yum' or ansible_pkg_mgr == 'dnf'
 
-    - name: Create linux-scripts subdirectory
-      file:
-        path: "{{ toolkit_dest }}/linux-scripts"
-        state: directory
-        mode: '0755'
-
-    - name: Copy linux-scripts directory structure
-      copy:
-        src: "{{ item }}"
-        dest: "{{ toolkit_dest }}/linux-scripts/{{ item | basename }}"
-        mode: preserve
-      loop: "{{ lookup('fileglob', '../linux-scripts/*', wantlist=True) }}"
-      loop_control:
-        label: "{{ item | basename }}"
-      when: item is file
+    - name: Clone or update repository
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ toolkit_dest }}"
+        version: "{{ repo_branch }}"
+        update: yes
+        force: yes
+      register: git_result
       ignore_errors: yes
 
-    - name: Copy linux-scripts files recursively (using find + copy)
-      shell: |
-        cd "{{ playbook_dir }}/../linux-scripts"
-        find . -type f -exec install -D -m 0644 {} "{{ toolkit_dest }}/linux-scripts/{}" \;
-      changed_when: true
+    - name: Fallback to archive method if git fails
+      unarchive:
+        src: "{{ repo_url | replace('.git', '') }}/archive/{{ repo_branch }}.zip"
+        dest: "{{ toolkit_dest }}"
+        remote_src: yes
+        creates: "{{ toolkit_dest }}/linux-scripts"
+      when: git_result is failed
       ignore_errors: yes
-      vars:
-        ansible_python_interpreter: "{{ ansible_python_interpreter | default('/usr/bin/python3') }}"
 
     - name: Make all scripts executable
       shell: |
@@ -138,42 +134,57 @@
   gather_facts: yes
 
   vars:
-    toolkit_dest: "C:\\CCDC-Toolkit"
+    toolkit_dest: "C:\\ccdc26"
+    repo_url: "{{ repo_url | default('https://github.com/YOUR_REPO/ccdc26.git') }}"
+    repo_branch: "{{ repo_branch | default('main') }}"
     run_full: false
 
   tasks:
-    - name: Create toolkit directory
-      win_file:
-        path: "{{ toolkit_dest }}"
-        state: directory
+    - name: Check if git is available
+      win_shell: |
+        $git = Get-Command git -ErrorAction SilentlyContinue
+        if ($git) { Write-Output "available" } else { Write-Output "not_available" }
+      register: git_check
+      changed_when: false
 
-    - name: Create windows-scripts subdirectory
-      win_file:
-        path: "{{ toolkit_dest }}\\windows-scripts"
-        state: directory
-
-    - name: Copy Windows scripts to remote host (using win_copy for directories)
-      win_copy:
-        src: "{{ item }}"
-        dest: "{{ toolkit_dest }}\\windows-scripts\\{{ item | basename }}"
-      loop: "{{ lookup('fileglob', '../windows-scripts/*', wantlist=True) }}"
-      loop_control:
-        label: "{{ item | basename }}"
-      when: item is file
+    - name: Clone repository using git (if available)
+      win_shell: |
+        if (Test-Path "{{ toolkit_dest }}") {
+          cd "{{ toolkit_dest }}"
+          git pull origin {{ repo_branch }}
+        } else {
+          git clone -b {{ repo_branch }} {{ repo_url }} "{{ toolkit_dest }}"
+        }
+      when: git_check.stdout == "available"
+      register: git_result
       ignore_errors: yes
 
-    - name: Copy Windows scripts recursively (PowerShell method)
+    - name: Download and extract ZIP archive (fallback if git not available)
       win_shell: |
-        $source = "{{ playbook_dir | replace('\\', '/') | replace('/', '\\') }}\..\windows-scripts"
-        $dest = "{{ toolkit_dest }}\windows-scripts"
-        if (Test-Path $source) {
-          Copy-Item -Path "$source\*" -Destination $dest -Recurse -Force
-          Write-Output "Copied scripts successfully"
-        } else {
-          Write-Output "ERROR: Source directory not found: $source"
-          exit 1
+        $zipUrl = "{{ repo_url | replace('.git', '') }}/archive/{{ repo_branch }}.zip"
+        $zipPath = "$env:TEMP\ccdc26.zip"
+        $extractPath = "{{ toolkit_dest }}"
+        
+        # Download
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath
+        
+        # Extract
+        if (Test-Path $extractPath) {
+          Remove-Item $extractPath -Recurse -Force
         }
-      register: win_copy_result
+        Expand-Archive -Path $zipPath -DestinationPath (Split-Path $extractPath) -Force
+        
+        # Rename extracted folder
+        $extractedFolder = Join-Path (Split-Path $extractPath) "ccdc26-{{ repo_branch }}"
+        if (Test-Path $extractedFolder) {
+          Move-Item $extractedFolder $extractPath -Force
+        }
+        
+        # Cleanup
+        Remove-Item $zipPath -Force
+        Write-Output "Extracted successfully"
+      when: git_check.stdout == "not_available" or git_result is failed
       ignore_errors: yes
 
     - name: Run full hardening (if enabled)
