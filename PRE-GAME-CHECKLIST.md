@@ -240,6 +240,119 @@ ansible windows -i ansible/inventory.ini -m win_ping
 
 ---
 
+## 🛒 APPLICATION FINDINGS
+
+### 9. OpenCart E-Commerce Platform
+
+**Location:** Ubuntu Ecom Server (172.20.242.30)
+
+**Discovered:** 
+- Running Apache httpd 2.4.58
+- OpenCart admin panel at: `http://172.20.242.30/admin`
+- Username/password login form visible
+
+**Confirmed from Database Inspection:**
+- Database name: `opencart`
+- Admin table: `oc_user`
+- Admin username: `admin` (confirmed)
+- Admin email: `admin@example.com`
+- Password hashing: **bcrypt** (`$2y$10$...`) - NOT MD5!
+- Account created: 2025-10-17 04:45:46
+
+**Admin Panel Credentials:**
+- Username: `admin` (confirmed)
+- Password to try: `admin`, `password`, `demo`, `Password123`
+
+**Suspicious Files Found in /home/sysadmin:**
+
+1. **`install-ssh-req.sh`** ⚠️ MALWARE-RELATED
+   - Installs `python3-paramiko` and `openssh-server`
+   - Paramiko is the SAME library used by startup_check malware
+   - Likely used to install malware dependencies
+   - **Remove immediately on game start**
+
+2. **`opencart-master/` directory and `master.zip`**
+   - OpenCart source code  
+   - Exposes version information to red team
+   - **Move to /root/backup/ or remove**
+
+**Security Risks:**
+1. **Admin Panel Exposure** - Red team WILL brute force this
+2. **SQL Injection** - OpenCart has history of SQLi vulnerabilities
+3. **File Upload Exploits** - Can be used to upload web shells
+4. **Default Install Files** - May still be present
+5. **Database Access** - Credentials stored in `config.php`
+
+**Immediate Actions on Game Start:**
+
+1. **Login and Change Admin Password** (Minute 5-10)
+   ```bash
+   # Try default credentials at: http://172.20.242.30/admin
+   # Navigate to: System → Users → Users
+   # Change admin password to team password
+   ```
+
+2. **Run OpenCart Hardening Script** (Minute 5-10)
+   ```bash
+   ssh sysadmin@172.20.242.30
+   cd /opt/ccdc26/linux-scripts/service-hardening
+   sudo ./harden-opencart.sh
+   ```
+
+   This script will:
+   - Remove `/install` directory (prevents reinstallation)
+   - Rename `/admin` to `/admin_secure_XXXXX` (obfuscation)
+   - Set secure file permissions
+   - Install fail2ban for brute force protection
+   - Enable Apache security headers
+
+3. **Remove Suspicious Files** (Minute 8-10)
+   ```bash
+   # Remove malware-related script
+   sudo rm /home/sysadmin/install-ssh-req.sh
+   
+   # Secure OpenCart source files
+   sudo mkdir -p /root/backup
+   sudo mv /home/sysadmin/opencart-master /root/backup/
+   sudo mv /home/sysadmin/master.zip /root/backup/
+   ```
+
+4. **Change Database Password** (Minute 10-15)
+   ```bash
+   # Find DB credentials
+   sudo grep "DB_" /var/www/html/config.php
+   
+   # Change password in MySQL (database name: opencart)
+   sudo mysql -u root -p opencart
+   ALTER USER 'opencart_user'@'localhost' IDENTIFIED BY 'NewPassword!';
+   FLUSH PRIVILEGES;
+   EXIT;
+   
+   # Update config.php with new password
+   sudo nano /var/www/html/config.php
+   # Update: define('DB_PASSWORD', 'NewPassword!');
+   ```
+
+5. **Monitor for Attacks** (Continuous)
+   ```bash
+   # Watch admin login attempts
+   sudo tail -f /var/log/apache2/access.log | grep -i "admin"
+   
+   # Check for SQLi attempts
+   sudo grep -iE "union.*select|concat\(" /var/log/apache2/access.log
+   
+   # Check for brute force (count POST requests to admin/login)
+   sudo grep "POST.*admin.*login" /var/log/apache2/access.log | wc -l
+   ```
+
+**Documentation Created:**
+- Full hardening guide: `APPLICATION-FINDINGS.md`
+- Automated hardening script: `linux-scripts/service-hardening/harden-opencart.sh`
+- Quick reference card: `OPENCART-QUICKREF.md`
+- Suspicious files investigation script: `linux-scripts/emergency/investigate-ecom-suspicious-files.sh`
+
+---
+
 ## 🌐 NETWORK ROUTING
 
 ### 8. VyOS Routing Configuration

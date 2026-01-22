@@ -233,16 +233,16 @@
         state: started
 
     - name: Get Wazuh service status
-      win_service_info:
-        name: WazuhSvc
+      win_shell: |
+        $svc = Get-Service -Name WazuhSvc -ErrorAction SilentlyContinue
+        if ($svc) { $svc.Status } else { "Not installed" }
       register: wazuh_service
 
     - name: Display Wazuh agent status
       debug:
         msg: |
-          Wazuh Agent Service: {{ wazuh_service.services[0].state | default('Not installed') }}
+          Wazuh Agent Service: {{ wazuh_service.stdout | trim }}
           Manager: {{ wazuh_manager }}
-      when: wazuh_service.services is defined
 
 
 # Create template directory and file inline

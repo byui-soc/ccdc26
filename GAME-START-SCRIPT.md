@@ -97,6 +97,30 @@ sudo ./deploy.sh
 # Select: 2 (Ansible) → 4 (Deploy Hardening) → 2 (Deploy and run)
 ```
 
+### OpenCart E-Commerce (Ubuntu Ecom - CRITICAL)
+
+**The Ecom server runs OpenCart with an admin panel at `/admin`**
+
+**Quick harden OpenCart:**
+```bash
+# SSH to Ecom server
+ssh sysadmin@172.20.242.30
+
+# Run hardening script
+cd /opt/ccdc26/linux-scripts/service-hardening
+sudo ./harden-opencart.sh
+
+# Try to login to admin panel (URL will be shown in script output)
+# Default creds to try: admin/admin, admin/password, admin/demo
+# CHANGE THE ADMIN PASSWORD IMMEDIATELY!
+```
+
+**Critical Actions:**
+- ☐ Login to OpenCart admin panel
+- ☐ Change admin password to team password
+- ☐ Document new admin URL (script renames /admin to /admin_secure_XXXXX)
+- ☐ Review and disable suspicious extensions
+
 ### Windows Manual Hardening
 
 **On EACH Windows machine, run as Administrator:**
@@ -308,6 +332,8 @@ sudo ufw status
 - **Quick Reference:** QUICKREF.md
 - **Detailed README:** README.md
 - **Ansible Inventory:** ansible/inventory.ini
+- **OpenCart Quick Reference:** OPENCART-QUICKREF.md ← Keep this open!
+- **Application Findings:** APPLICATION-FINDINGS.md
 
 ---
 
@@ -325,6 +351,9 @@ sudo ufw status
 - ☐ Run malware removal (Minute 0-2)
 - ☐ Change passwords (Minute 2-5)
 - ☐ Quick harden (Minute 5-10)
+  - ☐ Run hardening on all machines
+  - ☐ **OpenCart: Login and change admin password**
+  - ☐ **OpenCart: Run harden-opencart.sh script**
 - ☐ Deploy monitoring (Minute 10-15)
 - ☐ Start continuous monitoring (Minute 15+)
 
