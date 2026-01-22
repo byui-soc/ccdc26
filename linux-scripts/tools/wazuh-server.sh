@@ -545,22 +545,68 @@ quick_setup_docker() {
     mkdir -p "$wazuh_dir"
     cd "$wazuh_dir"
 
-    # Download official docker-compose
-    info "Downloading Wazuh Docker Compose configuration..."
-    curl -sO https://raw.githubusercontent.com/wazuh/wazuh-docker/v$WAZUH_VERSION/single-node/docker-compose.yml
+    # Try to use local wazuh-content directory from repository (preferred)
+    local script_dir="$(dirname "$0")"
+    local repo_root="$(cd "$script_dir/../.." && pwd)"
+    local local_wazuh_docker="$repo_root/wazuh-content/docker"
+    
+    if [ -d "$local_wazuh_docker" ] && [ -f "$local_wazuh_docker/docker-compose.yml" ]; then
+        info "Using local Wazuh Docker configuration from repository"
+        cp -r "$local_wazuh_docker"/* "$wazuh_dir/"
+        success "Copied local Docker configuration files"
+    else
+        # Fallback: Download official docker-compose
+        warn "Local Wazuh Docker files not found, downloading from GitHub..."
+        info "Downloading Wazuh Docker Compose configuration..."
+        curl -sO https://raw.githubusercontent.com/wazuh/wazuh-docker/v$WAZUH_VERSION/single-node/docker-compose.yml
+
+        # Download certificate generation script
+        info "Downloading certificate generation script..."
+        curl -sO https://raw.githubusercontent.com/wazuh/wazuh-docker/v$WAZUH_VERSION/single-node/generate-indexer-certs.yml
+        
+        # Create config directory and certs.yml file (required for certificate generation)
+        mkdir -p config
+        cat > config/certs.yml << EOF
+# Wazuh Certificate Configuration
+nodes:
+  indexer:
+    - name: wazuh.indexer
+      ip: "$WAZUH_MANAGER_IP"
+  server:
+    - name: wazuh.manager
+      ip: "$WAZUH_MANAGER_IP"
+  dashboard:
+    - name: wazuh.dashboard
+      ip: "$WAZUH_MANAGER_IP"
+EOF
+        info "Created certs.yml configuration file"
+    fi
+
+    # Ensure config directory exists
+    mkdir -p config/wazuh_indexer_ssl_certs
 
     # Generate certificates
-    info "Downloading certificate generation script..."
-    curl -sO https://raw.githubusercontent.com/wazuh/wazuh-docker/v$WAZUH_VERSION/single-node/generate-indexer-certs.yml
-    
     info "Generating SSL certificates..."
-    if docker compose -f generate-indexer-certs.yml run --rm generator 2>/dev/null; then
+    local cert_file=""
+    if [ -f "generate-certs.yml" ]; then
+        cert_file="generate-certs.yml"
+    elif [ -f "generate-indexer-certs.yml" ]; then
+        cert_file="generate-indexer-certs.yml"
+    else
+        error "Certificate generation file not found"
+        error "Expected generate-certs.yml or generate-indexer-certs.yml"
+        return 1
+    fi
+    
+    if docker compose -f "$cert_file" run --rm generator 2>/dev/null; then
         success "Certificates generated"
-    elif docker-compose -f generate-indexer-certs.yml run --rm generator 2>/dev/null; then
+    elif docker-compose -f "$cert_file" run --rm generator 2>/dev/null; then
         success "Certificates generated"
     else
         error "Failed to generate certificates"
         error "Check Docker daemon: systemctl status docker"
+        error "Verify config/certs.yml exists and is valid"
+        error "Check certificate generation logs above"
         return 1
     fi
 
