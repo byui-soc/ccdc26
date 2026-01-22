@@ -17,9 +17,9 @@
   gather_facts: yes
 
   vars:
-    wazuh_manager: "{{ wazuh_manager | default('CHANGE_ME') }}"
-    wazuh_registration_password: "{{ wazuh_registration_password | default('') }}"
-    wazuh_agent_group: "{{ wazuh_agent_group | default('linux') }}"
+    manager_ip: "{{ wazuh_manager | default('CHANGE_ME') }}"
+    reg_password: "{{ wazuh_registration_password | default('') }}"
+    agent_group: "{{ wazuh_agent_group | default('linux') }}"
     wazuh_version: "4.7.2"
     toolkit_dest: "/opt/ccdc26"
 
@@ -27,7 +27,7 @@
     - name: Fail if wazuh_manager not configured
       fail:
         msg: "wazuh_manager must be set! Use -e 'wazuh_manager=IP'"
-      when: wazuh_manager == 'CHANGE_ME'
+      when: manager_ip == 'CHANGE_ME'
 
     - name: Detect OS family
       set_fact:
@@ -67,7 +67,7 @@
             name: wazuh-agent
             state: present
           environment:
-            WAZUH_MANAGER: "{{ wazuh_manager }}"
+            WAZUH_MANAGER: "{{ manager_ip }}"
 
     # RHEL/CentOS Installation
     - name: Add Wazuh repository (RHEL/CentOS)
@@ -96,170 +96,16 @@
             name: wazuh-agent
             state: present
           environment:
-            WAZUH_MANAGER: "{{ wazuh_manager }}"
+            WAZUH_MANAGER: "{{ manager_ip }}"
 
     # Configuration (all Linux)
     - name: Configure Wazuh agent
-      template:
-        src: templates/ossec-linux.conf.j2
+      copy:
         dest: /var/ossec/etc/ossec.conf
         owner: root
         group: wazuh
         mode: '0640'
         backup: yes
-      when: ansible_os_family in ['Debian', 'RedHat']
-      ignore_errors: yes
-
-    # Registration
-    - name: Check if agent is registered
-      stat:
-        path: /var/ossec/etc/client.keys
-      register: client_keys
-
-    - name: Register agent with manager
-      shell: |
-        /var/ossec/bin/agent-auth -m {{ wazuh_manager }} -A {{ ansible_hostname }} {% if wazuh_registration_password %}-P {{ wazuh_registration_password }}{% endif %} {% if wazuh_agent_group != 'default' %}-G {{ wazuh_agent_group }}{% endif %}
-      when: not client_keys.stat.exists or client_keys.stat.size == 0
-      register: agent_auth
-      ignore_errors: yes
-
-    - name: Display registration result
-      debug:
-        msg: "Agent registration: {{ 'successful' if agent_auth.rc == 0 else 'may require manual registration' }}"
-      when: agent_auth is defined
-
-    # Service management
-    - name: Disable Wazuh repo updates (lock version)
-      shell: echo "wazuh-agent hold" | dpkg --set-selections
-      when: os_family == 'debian'
-      ignore_errors: yes
-
-    - name: Enable and start Wazuh agent service
-      systemd:
-        name: wazuh-agent
-        enabled: yes
-        state: started
-        daemon_reload: yes
-
-    - name: Verify Wazuh agent is running
-      shell: systemctl is-active wazuh-agent
-      register: wazuh_status
-      changed_when: false
-      ignore_errors: yes
-
-    - name: Display Wazuh agent status
-      debug:
-        msg: |
-          Wazuh Agent Status: {{ wazuh_status.stdout }}
-          Manager: {{ wazuh_manager }}
-
-
-- name: Deploy Wazuh agent to Windows hosts
-  hosts: windows
-  gather_facts: yes
-
-  vars:
-    wazuh_manager: "{{ wazuh_manager | default('CHANGE_ME') }}"
-    wazuh_registration_password: "{{ wazuh_registration_password | default('') }}"
-    wazuh_agent_group: "{{ wazuh_agent_group | default('windows') }}"
-    wazuh_version: "4.7.2"
-    toolkit_dest: "C:\\CCDC-Toolkit"
-
-  tasks:
-    - name: Fail if wazuh_manager not configured
-      fail:
-        msg: "wazuh_manager must be set! Use -e 'wazuh_manager=IP'"
-      when: wazuh_manager == 'CHANGE_ME'
-
-    - name: Check if Wazuh agent is already installed
-      win_stat:
-        path: "C:\\Program Files (x86)\\ossec-agent\\wazuh-agent.exe"
-      register: wazuh_installed
-
-    - name: Download Wazuh agent MSI
-      win_get_url:
-        url: "https://packages.wazuh.com/4.x/windows/wazuh-agent-{{ wazuh_version }}-1.msi"
-        dest: "{{ ansible_env.TEMP }}\\wazuh-agent.msi"
-      when: not wazuh_installed.stat.exists
-
-    - name: Install Wazuh agent
-      win_package:
-        path: "{{ ansible_env.TEMP }}\\wazuh-agent.msi"
-        arguments: >-
-          WAZUH_MANAGER={{ wazuh_manager }}
-          WAZUH_AGENT_GROUP={{ wazuh_agent_group }}
-          {% if wazuh_registration_password %}WAZUH_REGISTRATION_PASSWORD={{ wazuh_registration_password }}{% endif %}
-        state: present
-      when: not wazuh_installed.stat.exists
-      register: wazuh_install
-
-    - name: Remove installer
-      win_file:
-        path: "{{ ansible_env.TEMP }}\\wazuh-agent.msi"
-        state: absent
-
-    - name: Enable PowerShell Script Block Logging
-      win_regedit:
-        path: HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging
-        name: EnableScriptBlockLogging
-        data: 1
-        type: dword
-
-    - name: Enable PowerShell Module Logging
-      win_regedit:
-        path: HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging
-        name: EnableModuleLogging
-        data: 1
-        type: dword
-
-    - name: Enable command line auditing
-      win_regedit:
-        path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Audit
-        name: ProcessCreationIncludeCmdLine_Enabled
-        data: 1
-        type: dword
-
-    - name: Enable Process Creation auditing
-      win_shell: |
-        auditpol /set /subcategory:"Process Creation" /success:enable /failure:enable
-      ignore_errors: yes
-
-    - name: Ensure Wazuh agent service is running
-      win_service:
-        name: WazuhSvc
-        start_mode: auto
-        state: started
-
-    - name: Get Wazuh service status
-      win_shell: |
-        $svc = Get-Service -Name WazuhSvc -ErrorAction SilentlyContinue
-        if ($svc) { $svc.Status } else { "Not installed" }
-      register: wazuh_service
-
-    - name: Display Wazuh agent status
-      debug:
-        msg: |
-          Wazuh Agent Service: {{ wazuh_service.stdout | trim }}
-          Manager: {{ wazuh_manager }}
-
-
-# Create template directory and file inline
-- name: Create ossec.conf template
-  hosts: localhost
-  connection: local
-  gather_facts: no
-  run_once: yes
-
-  tasks:
-    - name: Ensure templates directory exists
-      file:
-        path: "{{ playbook_dir }}/templates"
-        state: directory
-        mode: '0755'
-
-    - name: Create Linux ossec.conf template
-      copy:
-        dest: "{{ playbook_dir }}/templates/ossec-linux.conf.j2"
         content: |
           <!--
             Wazuh Agent Configuration
@@ -272,7 +118,7 @@
                 <port>1514</port>
                 <protocol>tcp</protocol>
               </server>
-              <config-profile>{{ ansible_distribution | lower }}</config-profile>
+              <config-profile>{{ ansible_distribution | lower | default('linux') }}</config-profile>
               <notify_time>10</notify_time>
               <time-reconnect>60</time-reconnect>
               <auto_restart>yes</auto_restart>
@@ -389,4 +235,137 @@
               <log_format>json</log_format>
             </logging>
           </ossec_config>
-        mode: '0644'
+      when: ansible_os_family in ['Debian', 'RedHat']
+      ignore_errors: yes
+
+    # Registration
+    - name: Check if agent is registered
+      stat:
+        path: /var/ossec/etc/client.keys
+      register: client_keys
+
+    - name: Register agent with manager
+      shell: |
+        /var/ossec/bin/agent-auth -m {{ manager_ip }} -A {{ ansible_hostname }} {% if reg_password %}-P {{ reg_password }}{% endif %} {% if agent_group != 'default' %}-G {{ agent_group }}{% endif %}
+      when: not client_keys.stat.exists or client_keys.stat.size == 0
+      register: agent_auth
+      ignore_errors: yes
+
+    - name: Display registration result
+      debug:
+        msg: "Agent registration: {{ 'successful' if (agent_auth.rc | default(1)) == 0 else 'skipped or requires manual registration' }}"
+      when: agent_auth is defined and agent_auth.rc is defined
+
+    # Service management
+    - name: Disable Wazuh repo updates (lock version)
+      shell: echo "wazuh-agent hold" | dpkg --set-selections
+      when: os_family == 'debian'
+      ignore_errors: yes
+
+    - name: Enable and start Wazuh agent service
+      systemd:
+        name: wazuh-agent
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: Verify Wazuh agent is running
+      shell: systemctl is-active wazuh-agent
+      register: wazuh_status
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Display Wazuh agent status
+      debug:
+        msg: |
+          Wazuh Agent Status: {{ wazuh_status.stdout }}
+          Manager: {{ manager_ip }}
+
+
+- name: Deploy Wazuh agent to Windows hosts
+  hosts: windows
+  gather_facts: yes
+
+  vars:
+    manager_ip: "{{ wazuh_manager | default('CHANGE_ME') }}"
+    reg_password: "{{ wazuh_registration_password | default('') }}"
+    agent_group: "{{ wazuh_agent_group | default('windows') }}"
+    wazuh_version: "4.7.2"
+    toolkit_dest: "C:\\CCDC-Toolkit"
+
+  tasks:
+    - name: Fail if wazuh_manager not configured
+      fail:
+        msg: "wazuh_manager must be set! Use -e 'wazuh_manager=IP'"
+      when: manager_ip == 'CHANGE_ME'
+
+    - name: Check if Wazuh agent is already installed
+      win_stat:
+        path: "C:\\Program Files (x86)\\ossec-agent\\wazuh-agent.exe"
+      register: wazuh_installed
+
+    - name: Download Wazuh agent MSI
+      win_get_url:
+        url: "https://packages.wazuh.com/4.x/windows/wazuh-agent-{{ wazuh_version }}-1.msi"
+        dest: "{{ ansible_env.TEMP }}\\wazuh-agent.msi"
+      when: not wazuh_installed.stat.exists
+
+    - name: Install Wazuh agent
+      win_package:
+        path: "{{ ansible_env.TEMP }}\\wazuh-agent.msi"
+        arguments: >-
+          WAZUH_MANAGER={{ manager_ip }}
+          WAZUH_AGENT_GROUP={{ agent_group }}
+          {% if reg_password %}WAZUH_REGISTRATION_PASSWORD={{ reg_password }}{% endif %}
+        state: present
+      when: not wazuh_installed.stat.exists
+      register: wazuh_install
+
+    - name: Remove installer
+      win_file:
+        path: "{{ ansible_env.TEMP }}\\wazuh-agent.msi"
+        state: absent
+
+    - name: Enable PowerShell Script Block Logging
+      win_regedit:
+        path: HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging
+        name: EnableScriptBlockLogging
+        data: 1
+        type: dword
+
+    - name: Enable PowerShell Module Logging
+      win_regedit:
+        path: HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging
+        name: EnableModuleLogging
+        data: 1
+        type: dword
+
+    - name: Enable command line auditing
+      win_regedit:
+        path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Audit
+        name: ProcessCreationIncludeCmdLine_Enabled
+        data: 1
+        type: dword
+
+    - name: Enable Process Creation auditing
+      win_shell: |
+        auditpol /set /subcategory:"Process Creation" /success:enable /failure:enable
+      ignore_errors: yes
+
+    - name: Ensure Wazuh agent service is running
+      win_service:
+        name: WazuhSvc
+        start_mode: auto
+        state: started
+
+    - name: Get Wazuh service status
+      win_shell: |
+        $svc = Get-Service -Name WazuhSvc -ErrorAction SilentlyContinue
+        if ($svc) { $svc.Status } else { "Not installed" }
+      register: wazuh_service
+
+    - name: Display Wazuh agent status
+      debug:
+        msg: |
+          Wazuh Agent Service: {{ wazuh_service.stdout | trim }}
+          Manager: {{ manager_ip }}
