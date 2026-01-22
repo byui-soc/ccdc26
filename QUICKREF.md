@@ -1,4 +1,4 @@
-# CCDC26 Quick Reference
+<img width="440" height="68" alt="image" src="https://github.com/user-attachments/assets/07e35ba9-b98d-4ddf-b178-5dbed06bc89a" /># CCDC26 Quick Reference
 
 **Team 2 (BYU)** | **Date:** Jan 24, 2026 | **Drop Flag:** 9am MST
 
@@ -10,7 +10,7 @@
 
 | Machine | IP | User | Password | Scored Services |
 |---------|-----|------|----------|-----------------|
-| Ubuntu Ecom | 172.20.242.30 | sysadmin | changeme | HTTP, HTTPS |
+| Ubuntu Ecom | 172.20.242.30 | sysadmin | changeme | HTTP |
 | Fedora Webmail | 172.20.242.40 | sysadmin | changeme | SMTP, POP3 |
 | Splunk | 172.20.242.20 | root | changemenow | - |
 | Ubuntu Wks | **DHCP** | sysadmin | changeme | - |
@@ -20,7 +20,7 @@
 | Machine | IP | User | Password | Scored Services |
 |---------|-----|------|----------|-----------------|
 | AD/DNS 2019 | 172.20.240.102 | administrator | !Password123 | DNS |
-| Web 2019 | 172.20.240.101 | administrator | !Password123 | HTTP, HTTPS |
+| Web 2019 | 172.20.240.101 | administrator | !Password123 | HTTP |
 | FTP 2022 | 172.20.240.104 | administrator | !Password123 | - |
 | Win11 Wks | 172.20.240.100 | administrator | !Password123 | - |
 
@@ -241,10 +241,22 @@ query user                          # See sessions
 logoff <session_id>                 # Boot them
 ```
 
+### Shutdown network interface (stops services from running)
+```bash
+
+# Linux - network shutdown / start up
+sudo ip link set ens18 down
+sudo ip link set ens18 up
+```
+
 ### Block IP
 ```bash
 # Linux (UFW)
 sudo ufw deny from 10.0.0.100
+
+# Linux (Iptables)
+iptables -t filter -I INPUT -s 10.0.0.100 -j DROP
+iptables -t filter -I OUTPUT -d 10.0.0.100 -j DROP
 
 # Windows
 New-NetFirewallRule -DisplayName "Block" -Direction Inbound -RemoteAddress 10.0.0.100 -Action Block
@@ -279,7 +291,6 @@ Get-NetTCPConnection | Where-Object {$_.State -eq "Established"}
 | Service | Port | Server |
 |---------|------|--------|
 | HTTP | 80 | Ubuntu Ecom, Web 2019 |
-| HTTPS | 443 | Ubuntu Ecom, Web 2019 |
 | SMTP | 25 | Fedora Webmail |
 | POP3 | 110 | Fedora Webmail |
 | DNS | 53/udp | AD/DNS 2019 |
