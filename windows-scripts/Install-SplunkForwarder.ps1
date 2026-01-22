@@ -1,17 +1,44 @@
-# CCDC26 Windows Toolkit - Splunk Universal Forwarder Setup
-# Forwards logs to the existing competition Splunk server as backup SIEM
-#
-# Competition Splunk Server: 172.20.242.20:9997
-# Run as Administrator
+<#
+.SYNOPSIS
+    CCDC26 - Splunk Universal Forwarder Setup for Windows
+    
+.DESCRIPTION
+    Installs and configures Splunk Universal Forwarder to send logs to the
+    competition Splunk server (Oracle Linux 9.2, Splunk 10.0.2).
+    
+    Server: 172.20.242.20:9997
+    
+.EXAMPLE
+    .\Install-SplunkForwarder.ps1
+    Interactive menu
+    
+.EXAMPLE
+    .\Install-SplunkForwarder.ps1 -Quick
+    Quick setup (install + configure + start)
+    
+.EXAMPLE
+    .\Install-SplunkForwarder.ps1 -Status
+    Check current status
+#>
+
+param(
+    [switch]$Quick,
+    [switch]$Status,
+    [switch]$Install,
+    [switch]$Configure,
+    [switch]$Start,
+    [switch]$Stop
+)
 
 #Requires -RunAsAdministrator
 
 # CONFIGURATION - Competition Splunk Server
 $SPLUNK_SERVER = "172.20.242.20"
 $SPLUNK_PORT = "9997"
-$SPLUNK_VERSION = "9.1.2"
+$SPLUNK_VERSION = "10.2.0"
+$SPLUNK_BUILD = "d749cb17ea65"
 $SPLUNK_HOME = "C:\Program Files\SplunkUniversalForwarder"
-$SPLUNK_MSI_URL = "https://download.splunk.com/products/universalforwarder/releases/$SPLUNK_VERSION/windows/splunkforwarder-$SPLUNK_VERSION-x64-release.msi"
+$SPLUNK_MSI_URL = "https://download.splunk.com/products/universalforwarder/releases/$SPLUNK_VERSION/windows/splunkforwarder-$SPLUNK_VERSION-$SPLUNK_BUILD-windows-x64.msi"
 
 function Write-Info { Write-Host "[*] $args" -ForegroundColor Cyan }
 function Write-Success { Write-Host "[+] $args" -ForegroundColor Green }
@@ -52,12 +79,21 @@ function Install-SplunkForwarder {
         # Clean up
         Remove-Item $msiPath -Force -ErrorAction SilentlyContinue
         
-        Write-Success "Splunk Universal Forwarder installed"
+        # Verify installation
+        if (Test-Path "$SPLUNK_HOME\bin\splunk.exe") {
+            Write-Success "Splunk Universal Forwarder installed and verified"
+        } else {
+            Write-Error "Installation completed but splunk.exe not found at $SPLUNK_HOME\bin\splunk.exe"
+            Write-Warning "Installation may have failed - check manually"
+            return $false
+        }
     }
     catch {
         Write-Error "Failed to install Splunk UF: $_"
         Write-Warning "Try manual installation from: $SPLUNK_MSI_URL"
+        return $false
     }
+    return $true
 }
 
 function Configure-SplunkForwarder {
@@ -85,7 +121,7 @@ compressed = true
     # Configure inputs.conf for Windows Event Logs
     $inputsConf = @"
 # CCDC26 Splunk Forwarder - Windows Event Log Collection
-# Backup SIEM forwarding to competition Splunk server
+# Competition Splunk server: 172.20.242.20:9997
 
 [default]
 host = $env:COMPUTERNAME
@@ -95,7 +131,7 @@ host = $env:COMPUTERNAME
 # =============================================================================
 [WinEventLog://Security]
 disabled = false
-index = security
+index = windows-security
 sourcetype = WinEventLog:Security
 evt_resolve_ad_obj = 1
 checkpointInterval = 5
@@ -105,12 +141,12 @@ checkpointInterval = 5
 # =============================================================================
 [WinEventLog://System]
 disabled = false
-index = os
+index = windows-system
 sourcetype = WinEventLog:System
 
 [WinEventLog://Application]
 disabled = false
-index = os
+index = windows-application
 sourcetype = WinEventLog:Application
 
 # =============================================================================
@@ -118,12 +154,12 @@ sourcetype = WinEventLog:Application
 # =============================================================================
 [WinEventLog://Microsoft-Windows-PowerShell/Operational]
 disabled = false
-index = security
+index = windows-powershell
 sourcetype = WinEventLog:PowerShell
 
 [WinEventLog://PowerShellCore/Operational]
 disabled = false
-index = security
+index = windows-powershell
 sourcetype = WinEventLog:PowerShell
 
 # =============================================================================
@@ -131,7 +167,7 @@ sourcetype = WinEventLog:PowerShell
 # =============================================================================
 [WinEventLog://Microsoft-Windows-Windows Defender/Operational]
 disabled = false
-index = security
+index = windows-security
 sourcetype = WinEventLog:Defender
 
 # =============================================================================
@@ -139,7 +175,7 @@ sourcetype = WinEventLog:Defender
 # =============================================================================
 [WinEventLog://Microsoft-Windows-Windows Firewall With Advanced Security/Firewall]
 disabled = false
-index = security
+index = windows-security
 sourcetype = WinEventLog:Firewall
 
 # =============================================================================
@@ -147,7 +183,7 @@ sourcetype = WinEventLog:Firewall
 # =============================================================================
 [WinEventLog://Microsoft-Windows-TaskScheduler/Operational]
 disabled = false
-index = security
+index = windows-security
 sourcetype = WinEventLog:TaskScheduler
 
 # =============================================================================
@@ -155,12 +191,12 @@ sourcetype = WinEventLog:TaskScheduler
 # =============================================================================
 [WinEventLog://Microsoft-Windows-TerminalServices-LocalSessionManager/Operational]
 disabled = false
-index = security
+index = windows-security
 sourcetype = WinEventLog:RDP
 
 [WinEventLog://Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational]
 disabled = false
-index = security
+index = windows-security
 sourcetype = WinEventLog:RDP
 
 # =============================================================================
@@ -168,7 +204,7 @@ sourcetype = WinEventLog:RDP
 # =============================================================================
 [WinEventLog://Microsoft-Windows-Sysmon/Operational]
 disabled = false
-index = security
+index = windows-sysmon
 sourcetype = WinEventLog:Sysmon
 renderXml = true
 
@@ -177,7 +213,7 @@ renderXml = true
 # =============================================================================
 [WinEventLog://DNS Server]
 disabled = false
-index = dns
+index = windows-dns
 sourcetype = WinEventLog:DNS
 
 # =============================================================================
@@ -185,16 +221,8 @@ sourcetype = WinEventLog:DNS
 # =============================================================================
 [WinEventLog://Directory Service]
 disabled = false
-index = security
+index = windows-security
 sourcetype = WinEventLog:DirectoryService
-
-# =============================================================================
-# IIS LOGS (if present)
-# =============================================================================
-[monitor://C:\inetpub\logs\LogFiles\...]
-disabled = false
-index = web
-sourcetype = iis
 "@
     
     Set-Content -Path "$localDir\inputs.conf" -Value $inputsConf
@@ -386,6 +414,18 @@ function Show-Menu {
 }
 
 # Main
-if ($MyInvocation.InvocationName -ne '.') {
+if ($Quick) {
+    Invoke-QuickSetup
+} elseif ($Status) {
+    Get-SplunkStatus
+} elseif ($Install) {
+    Install-SplunkForwarder
+} elseif ($Configure) {
+    Configure-SplunkForwarder
+} elseif ($Start) {
+    Start-SplunkForwarder
+} elseif ($Stop) {
+    Stop-SplunkForwarder
+} else {
     Show-Menu
 }
