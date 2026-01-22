@@ -490,10 +490,29 @@ check_status() {
 }
 
 #=============================================================================
-# QUICK SETUP (DOCKER)
+# QUICK SETUP (DOCKER - LIGHTWEIGHT)
+#=============================================================================
+quick_setup_docker_lightweight() {
+    header "Quick Setup - Docker Compose (Lightweight - Manager Only)"
+    
+    # Force lightweight mode
+    local force_lightweight=true
+    quick_setup_docker_internal "$force_lightweight"
+}
+
+#=============================================================================
+# QUICK SETUP (DOCKER - FULL)
 #=============================================================================
 quick_setup_docker() {
-    header "Quick Setup - Docker Compose"
+    header "Quick Setup - Docker Compose (Full Stack)"
+    
+    # Full stack mode
+    local force_lightweight=false
+    quick_setup_docker_internal "$force_lightweight"
+}
+
+quick_setup_docker_internal() {
+    local use_lightweight="${1:-false}"
 
     if ! command -v docker &>/dev/null; then
         error "Docker not installed. Install Docker first:"
@@ -545,6 +564,11 @@ quick_setup_docker() {
     mkdir -p "$wazuh_dir"
     cd "$wazuh_dir"
 
+    # Clean up any failed containers from previous attempts
+    info "Cleaning up any failed containers..."
+    docker ps -a --filter "name=wazuh" --format "{{.Names}}" | xargs -r docker rm -f 2>/dev/null || true
+    docker volume ls --filter "name=wazuh" --format "{{.Name}}" | xargs -r docker volume rm 2>/dev/null || true
+    
     # Clean up any existing problematic config/certs.yml if it's a directory
     if [ -d "config/certs.yml" ]; then
         warn "Removing existing config/certs.yml directory (from previous failed run)"
@@ -558,8 +582,39 @@ quick_setup_docker() {
     
     if [ -d "$local_wazuh_docker" ] && [ -f "$local_wazuh_docker/docker-compose.yml" ]; then
         info "Using local Wazuh Docker configuration from repository"
-        # Copy files carefully, ensuring certs.yml is a file
-        cp -r "$local_wazuh_docker"/* "$wazuh_dir/"
+        
+        # Use lightweight version if requested or if RAM is low
+        if [ "$use_lightweight" = "true" ]; then
+            if [ -f "$local_wazuh_docker/docker-compose.lightweight.yml" ]; then
+                cp "$local_wazuh_docker/docker-compose.lightweight.yml" "$wazuh_dir/docker-compose.yml"
+                info "Using lightweight configuration (manager only, ~1GB RAM)"
+            else
+                warn "Lightweight compose file not found, using full version"
+                cp -r "$local_wazuh_docker"/* "$wazuh_dir/"
+            fi
+        else
+            # Check available RAM and warn if low
+            local total_ram=$(free -g | awk '/^Mem:/{print $2}')
+            if [ "$total_ram" -lt 4 ]; then
+                warn "System has only ${total_ram}GB RAM - full stack requires ~4GB"
+                warn "Consider using lightweight option (manager only, ~1GB RAM)"
+                echo ""
+                read -p "Continue with full stack anyway? [y/N]: " continue_full
+                if [[ ! "$continue_full" =~ ^[Yy]$ ]]; then
+                    info "Switching to lightweight mode..."
+                    use_lightweight="true"
+                    if [ -f "$local_wazuh_docker/docker-compose.lightweight.yml" ]; then
+                        cp "$local_wazuh_docker/docker-compose.lightweight.yml" "$wazuh_dir/docker-compose.yml"
+                        info "Using lightweight configuration (manager only)"
+                    fi
+                else
+                    cp -r "$local_wazuh_docker"/* "$wazuh_dir/"
+                fi
+            else
+                # Copy files carefully, ensuring certs.yml is a file
+                cp -r "$local_wazuh_docker"/* "$wazuh_dir/"
+            fi
+        fi
         # Verify certs.yml is a file, not a directory
         if [ -d "config/certs.yml" ]; then
             warn "config/certs.yml is a directory, fixing..."
@@ -617,64 +672,150 @@ EOF
         info "Created certs.yml configuration file"
     fi
 
-    # Ensure config directory exists and certs.yml is a file
-    mkdir -p config/wazuh_indexer_ssl_certs
-    if [ ! -f "config/certs.yml" ]; then
-        error "config/certs.yml file not found or is not a regular file"
-        return 1
+    # Check if using lightweight version (no certificates needed)
+    local using_lightweight=false
+    if [ "$use_lightweight" = "true" ] || (grep -q "INDEXER_URL=" docker-compose.yml 2>/dev/null && ! grep -q "INDEXER_URL=https" docker-compose.yml 2>/dev/null); then
+        using_lightweight=true
+        info "Lightweight mode - manager only (no indexer/dashboard, no certificates needed)"
     fi
 
-    # Generate certificates
-    info "Generating SSL certificates..."
-    local cert_file=""
-    if [ -f "generate-certs.yml" ]; then
-        cert_file="generate-certs.yml"
-    elif [ -f "generate-indexer-certs.yml" ]; then
-        cert_file="generate-indexer-certs.yml"
-    else
-        error "Certificate generation file not found"
-        error "Expected generate-certs.yml or generate-indexer-certs.yml"
-        return 1
-    fi
-    
-    if docker compose -f "$cert_file" run --rm generator 2>/dev/null; then
-        success "Certificates generated"
-    elif docker-compose -f "$cert_file" run --rm generator 2>/dev/null; then
-        success "Certificates generated"
-    else
-        error "Failed to generate certificates"
-        error "Check Docker daemon: systemctl status docker"
-        error "Verify config/certs.yml exists and is valid"
-        error "Check certificate generation logs above"
-        return 1
+    # Generate certificates (only if not using lightweight mode)
+    if [ "$using_lightweight" = false ]; then
+        # Ensure config directory exists and certs.yml is a file
+        mkdir -p config/wazuh_indexer_ssl_certs
+        if [ ! -f "config/certs.yml" ]; then
+            error "config/certs.yml file not found or is not a regular file"
+            return 1
+        fi
+
+        info "Generating SSL certificates..."
+        local cert_file=""
+        if [ -f "generate-certs.yml" ]; then
+            cert_file="generate-certs.yml"
+        elif [ -f "generate-indexer-certs.yml" ]; then
+            cert_file="generate-indexer-certs.yml"
+        else
+            error "Certificate generation file not found"
+            error "Expected generate-certs.yml or generate-indexer-certs.yml"
+            return 1
+        fi
+        
+        if docker compose -f "$cert_file" run --rm generator 2>/dev/null; then
+            success "Certificates generated"
+        elif docker-compose -f "$cert_file" run --rm generator 2>/dev/null; then
+            success "Certificates generated"
+        else
+            error "Failed to generate certificates"
+            error "Check Docker daemon: systemctl status docker"
+            error "Verify config/certs.yml exists and is valid"
+            error "Check certificate generation logs above"
+            return 1
+        fi
     fi
 
     # Start Wazuh
     info "Starting Wazuh containers..."
-    if docker compose up -d 2>/dev/null; then
-        success "Containers started"
-    elif docker-compose up -d 2>/dev/null; then
-        success "Containers started"
+    
+    # Check for port conflicts first
+    local ports_in_use=""
+    for port in 443 1514 1515 55000 9200; do
+        if (netstat -tuln 2>/dev/null | grep -q ":$port ") || (ss -tuln 2>/dev/null | grep -q ":$port "); then
+            ports_in_use="$ports_in_use $port"
+        fi
+    done
+    if [ -n "$ports_in_use" ]; then
+        warn "Ports already in use:$ports_in_use"
+        warn "This may prevent containers from starting"
+    fi
+    
+    # Determine which compose command to use
+    local compose_cmd=""
+    if docker compose version &>/dev/null 2>&1; then
+        compose_cmd="docker compose"
+        info "Using Docker Compose v2"
+    elif command -v docker-compose &>/dev/null; then
+        compose_cmd="docker-compose"
+        info "Using Docker Compose v1"
     else
-        error "Failed to start containers"
-        error "Check Docker daemon: systemctl status docker"
-        error "Check Docker logs: journalctl -u docker"
+        error "Neither 'docker compose' nor 'docker-compose' is available"
         return 1
     fi
+    
+    # Attempt to start containers and capture output
+    local start_output=$(mktemp)
+    info "Running: $compose_cmd up -d"
+    
+    if $compose_cmd up -d > "$start_output" 2>&1; then
+        # Wait a moment for containers to initialize
+        sleep 3
+        
+        # Check if containers are actually running
+        local running_count=$($compose_cmd ps --format json 2>/dev/null | grep -c '"State":"running"' || \
+                             $compose_cmd ps 2>/dev/null | grep -c "Up" || echo "0")
+        
+        if [ "$running_count" -gt 0 ]; then
+            success "Containers started ($running_count running)"
+            $compose_cmd ps
+        else
+            error "Docker Compose command succeeded but no containers are running"
+            error "Container status:"
+            $compose_cmd ps
+            error "Recent container logs:"
+            $compose_cmd logs --tail=50
+            rm -f "$start_output"
+            return 1
+        fi
+    else
+        error "Failed to start containers"
+        error "Docker Compose output:"
+        cat "$start_output"
+        error ""
+        error "Container status:"
+        $compose_cmd ps 2>/dev/null || true
+        error "Recent logs:"
+        $compose_cmd logs --tail=50 2>/dev/null || true
+        error ""
+        error "Troubleshooting:"
+        error "1. Check if ports are in use: netstat -tuln | grep -E ':(443|1514|1515|55000|9200)'"
+        error "2. Check Docker logs: journalctl -u docker -n 50"
+        error "3. Check disk space: df -h"
+        error "4. Try manually: cd $wazuh_dir && $compose_cmd up -d"
+        rm -f "$start_output"
+        return 1
+    fi
+    
+    rm -f "$start_output"
 
-    # Wait for startup
-    info "Waiting for services to start (this may take 2-3 minutes)..."
-    sleep 120
+    # Wait for startup (shorter wait for lightweight)
+    if [ "$using_lightweight" = true ]; then
+        info "Waiting for manager to start (this may take 30-60 seconds)..."
+        sleep 30
+    else
+        info "Waiting for services to start (this may take 2-3 minutes)..."
+        sleep 120
+    fi
 
     success "============================================"
     success "Wazuh Docker Setup Complete!"
     success "============================================"
     echo ""
-    info "Dashboard: https://$WAZUH_MANAGER_IP:443"
-    info "Username: admin"
-    info "Password: SecretPassword"
-    echo ""
-    warn "Change the default password immediately!"
+    
+    if [ "$using_lightweight" = true ]; then
+        info "Manager IP: $WAZUH_MANAGER_IP"
+        info "Agent Events Port: 1514"
+        info "Agent Enrollment Port: 1515"
+        info "API Port: 55000"
+        echo ""
+        warn "Note: This is manager-only mode (no dashboard)"
+        warn "View logs: docker compose logs -f wazuh-manager"
+        warn "Check agents: docker exec wazuh-manager /var/ossec/bin/agent_control -l"
+    else
+        info "Dashboard: https://$WAZUH_MANAGER_IP:443"
+        info "Username: admin"
+        info "Password: SecretPassword"
+        echo ""
+        warn "Change the default password immediately!"
+    fi
     echo ""
     info "To stop: cd $wazuh_dir && docker compose down"
     info "To view logs: docker compose logs -f"
@@ -725,23 +866,43 @@ main() {
     # Auto-detect IP
     WAZUH_MANAGER_IP=$(hostname -I | awk '{print $1}')
 
+    # Check available RAM and recommend accordingly
+    local total_ram=$(free -g | awk '/^Mem:/{print $2}')
+    local recommended_option="1"
+    
     echo ""
     echo "Wazuh Server Options:"
-    echo "1) Quick setup - Docker Compose (recommended for testing)"
-    echo "2) Full installation - Package-based (recommended for production)"
-    echo "3) Check status"
-    echo "4) View credentials"
-    echo "5) Restart all services"
-    echo "6) Stop all services"
-    echo "7) View agent list"
     echo ""
-    read -p "Select option [1-7]: " choice
+    if [ "$total_ram" -lt 4 ]; then
+        warn "System has ${total_ram}GB RAM - lightweight option recommended"
+        echo ""
+    fi
+    echo "1) Quick setup - Docker Lightweight (manager only, ~1GB RAM) ⭐ RECOMMENDED for ${total_ram}GB systems"
+    echo "2) Quick setup - Docker Full (manager + indexer + dashboard, ~4GB RAM)"
+    echo "3) Full installation - Package-based (~4GB RAM, requires 4GB+ RAM)"
+    echo ""
+    echo "4) Check status"
+    echo "5) View credentials"
+    echo "6) Restart all services"
+    echo "7) Stop all services"
+    echo "8) View agent list"
+    echo ""
+    read -p "Select option [1-8] (default: $recommended_option): " choice
+    choice="${choice:-$recommended_option}"
 
     case $choice in
-        1) quick_setup_docker ;;
-        2) full_install ;;
-        3) check_status ;;
-        4)
+        1) quick_setup_docker_lightweight ;;
+        2) quick_setup_docker ;;
+        3) 
+            if [ "$total_ram" -lt 4 ]; then
+                error "Package installation requires 4GB+ RAM (you have ${total_ram}GB)"
+                error "Use option 1 (lightweight Docker) instead"
+                return 1
+            fi
+            full_install 
+            ;;
+        4) check_status ;;
+        5)
             if [ -f /root/.wazuh/credentials.txt ]; then
                 cat /root/.wazuh/credentials.txt
             else
@@ -749,16 +910,22 @@ main() {
                 info "Default Docker credentials: admin / SecretPassword"
             fi
             ;;
-        5)
-            systemctl restart wazuh-indexer wazuh-manager filebeat wazuh-dashboard
+        6)
+            systemctl restart wazuh-indexer wazuh-manager filebeat wazuh-dashboard 2>/dev/null || \
+            docker compose -f /opt/wazuh-docker/docker-compose.yml restart 2>/dev/null || \
+            docker-compose -f /opt/wazuh-docker/docker-compose.yml restart 2>/dev/null
             success "Services restarted"
             ;;
-        6)
-            systemctl stop wazuh-dashboard filebeat wazuh-manager wazuh-indexer
+        7)
+            systemctl stop wazuh-dashboard filebeat wazuh-manager wazuh-indexer 2>/dev/null || \
+            docker compose -f /opt/wazuh-docker/docker-compose.yml stop 2>/dev/null || \
+            docker-compose -f /opt/wazuh-docker/docker-compose.yml stop 2>/dev/null
             success "Services stopped"
             ;;
-        7)
-            $WAZUH_DIR/bin/agent_control -l 2>/dev/null || error "Manager not running"
+        8)
+            $WAZUH_DIR/bin/agent_control -l 2>/dev/null || \
+            docker exec wazuh-manager /var/ossec/bin/agent_control -l 2>/dev/null || \
+            error "Manager not running"
             ;;
         *) error "Invalid option" ;;
     esac
