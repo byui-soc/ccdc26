@@ -13,8 +13,8 @@ ansible all -i inventory.ini -m ping
 # 3. IMMEDIATELY: Change all passwords
 ansible-playbook -i inventory.ini change_all_passwords.yml -e "new_password=YourSecureP@ss123!"
 
-# 4. Deploy Wazuh agents (after setting up Wazuh server)
-ansible-playbook -i inventory.ini deploy_wazuh.yml -e "wazuh_manager=172.20.242.50"
+# 4. Deploy Splunk forwarders
+ansible-playbook -i inventory.ini deploy_splunk_forwarders.yml
 
 # 5. Deploy hardening to all hosts
 ansible-playbook -i inventory.ini deploy_hardening.yml
@@ -33,7 +33,7 @@ ansible/
 ├── change_all_passwords.yml    # Mass password reset (RUN FIRST!)
 ├── changepw_kick.yml           # Password reset + user creation
 ├── deploy_hardening.yml        # Deploy linux-scripts
-├── deploy_wazuh.yml            # Deploy Wazuh agents
+├── deploy_splunk_forwarders.yml # Deploy Splunk forwarders
 └── gather_facts.yml            # Collect host information
 ```
 
@@ -132,19 +132,16 @@ ansible-playbook -i inventory.ini deploy_hardening.yml --limit ecom,webmail
 - Works standalone: hosts can run scripts without Ansible
 - Standard tool (git) vs custom file copying logic
 
-### deploy_wazuh.yml
+### deploy_splunk_forwarders.yml
 
-**Purpose**: Deploy Wazuh agents to all hosts
+**Purpose**: Deploy Splunk Universal Forwarders to all hosts
 
 ```bash
-# Deploy agents (Linux and Windows)
-ansible-playbook -i inventory.ini deploy_wazuh.yml -e "wazuh_manager=10.0.0.100"
-
-# With registration password
-ansible-playbook -i inventory.ini deploy_wazuh.yml \
-  -e "wazuh_manager=10.0.0.100" \
-  -e "wazuh_registration_password=MySecretPassword"
+# Deploy forwarders to all Linux and Windows hosts
+ansible-playbook -i inventory.ini deploy_splunk_forwarders.yml
 ```
+
+Forwarders send logs to the competition Splunk server at 172.20.242.20:9997.
 
 ### gather_facts.yml
 
@@ -161,15 +158,16 @@ Edit `vars.yml` or pass via command line:
 
 ```bash
 # Override variables
-ansible-playbook playbook.yml -e "wazuh_manager=10.0.0.100" -e "temp_password=NewPass123"
+ansible-playbook playbook.yml -e "splunk_server=172.20.242.20" -e "temp_password=NewPass123"
 ```
 
 Key variables:
-- `wazuh_manager`: IP of Wazuh manager
 - `toolkit_dest`: Where to deploy scripts (default: /opt/ccdc26)
 - `repo_url`: Repository URL for git clone (default: from inventory or github)
 - `repo_branch`: Branch to clone (default: main)
 - `competition_users`: List of users to create
+- `splunk_server`: Splunk server IP (default: 172.20.242.20)
+- `splunk_port`: Splunk receiving port (default: 9997)
 
 ## Requirements
 

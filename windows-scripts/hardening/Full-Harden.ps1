@@ -526,9 +526,9 @@ function Detect-WindowsServices {
         Info "Detected: SQL Server"
     }
     
-    # Check for Wazuh Agent
-    if ((Get-Service -Name "WazuhSvc" -ErrorAction SilentlyContinue).Status -eq "Running") {
-        Info "Detected: Wazuh Agent (outbound only, no inbound needed)"
+    # Check for Splunk Forwarder
+    if ((Get-Service -Name "SplunkForwarder" -ErrorAction SilentlyContinue).Status -eq "Running") {
+        Info "Detected: Splunk Forwarder (outbound only, no inbound needed)"
     }
     
     return $detectedPorts | Sort-Object -Unique
@@ -683,7 +683,7 @@ function Invoke-QuickHarden {
     Write-Host "2. Change all user passwords" -ForegroundColor Gray
     Write-Host "3. Review scheduled tasks" -ForegroundColor Gray
     Write-Host "4. If DC, run AD-Harden.ps1" -ForegroundColor Gray
-    Write-Host "5. Deploy Wazuh agent" -ForegroundColor Gray
+    Write-Host "5. Deploy Splunk forwarder" -ForegroundColor Gray
     Write-Host ""
     
     Log-Action "Quick harden completed in $duration seconds"

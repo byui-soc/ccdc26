@@ -69,10 +69,10 @@ detect_running_services() {
         info "Detected: Splunk"
     fi
     
-    # Check for Wazuh
-    if systemctl is-active wazuh-manager &>/dev/null; then
-        detected_tcp="$detected_tcp 1514 1515 55000"
-        info "Detected: Wazuh Manager"
+    # Check for Splunk
+    if systemctl is-active splunk &>/dev/null || [ -f /opt/splunk/bin/splunk ]; then
+        detected_tcp="$detected_tcp 9997 8000 8089"
+        info "Detected: Splunk Server"
     fi
     
     # Remove duplicates and format

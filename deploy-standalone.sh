@@ -124,7 +124,7 @@ info "Available commands:"
 echo "  cd $TOOLKIT_DEST/linux-scripts"
 echo "  sudo ./hardening/full-harden.sh          # Run full hardening"
 echo "  sudo ./services/harden-all.sh             # Harden all services"
-echo "  sudo ./tools/wazuh-agent.sh              # Install Wazuh agent"
+echo "  sudo ./tools/splunk-forwarder.sh         # Install Splunk forwarder"
 echo "  sudo ./persistence-hunting/full-hunt.sh  # Hunt for persistence"
 echo ""
 

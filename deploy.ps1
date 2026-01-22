@@ -35,8 +35,8 @@ function Get-Environment {
     # Check for IIS
     $script:HasIIS = (Get-Service -Name "W3SVC" -ErrorAction SilentlyContinue) -ne $null
     
-    # Check for Wazuh
-    $script:HasWazuh = Test-Path "C:\Program Files (x86)\ossec-agent"
+    # Check for Splunk Forwarder
+    $script:HasSplunk = Test-Path "C:\Program Files\SplunkUniversalForwarder"
 }
 
 #=============================================================================
@@ -59,7 +59,7 @@ function Show-Banner {
     Write-Host "Domain:      " -NoNewline; Write-Host $(if ($IsDomainJoined) { "Yes" } else { "No" }) -ForegroundColor Green
     Write-Host "DC:          " -NoNewline; Write-Host $(if ($IsDomainController) { "Yes" } else { "No" }) -ForegroundColor $(if ($IsDomainController) { "Yellow" } else { "Green" })
     Write-Host "IIS:         " -NoNewline; Write-Host $(if ($HasIIS) { "Installed" } else { "Not installed" }) -ForegroundColor Green
-    Write-Host "Wazuh:       " -NoNewline; Write-Host $(if ($HasWazuh) { "Installed" } else { "Not installed" }) -ForegroundColor Green
+    Write-Host "Splunk:      " -NoNewline; Write-Host $(if ($HasSplunk) { "Installed" } else { "Not installed" }) -ForegroundColor Green
     Write-Host ""
 }
 
@@ -177,7 +177,7 @@ function Show-ToolsMenu {
     Write-Host ""
     Write-Host "=== Tools ===" -ForegroundColor Magenta
     Write-Host ""
-    Write-Host "1) Deploy Wazuh Agent"
+    Write-Host "1) Deploy Splunk Forwarder"
     Write-Host "2) Password Generator (Zulu)"
     Write-Host "3) User Audit"
     Write-Host "4) Service Audit"
@@ -191,16 +191,10 @@ function Show-ToolsMenu {
     switch ($choice) {
         "1" {
             Require-Admin
-            Write-Host "`n=== Deploying Wazuh Agent ===" -ForegroundColor Magenta
-            $wazuhManager = Read-Host "Enter Wazuh manager IP"
+            Write-Host "`n=== Deploying Splunk Forwarder ===" -ForegroundColor Magenta
+            Write-Host "Forwarding to competition Splunk server: 172.20.242.20:9997" -ForegroundColor Cyan
             
-            if (-not [string]::IsNullOrEmpty($wazuhManager)) {
-                # Update the script with the manager IP
-                $scriptPath = "$ScriptDir\windows-scripts\Install-WazuhAgent.ps1"
-                (Get-Content $scriptPath) -replace '\$WAZUH_MANAGER\s*=\s*"[^"]*"', "`$WAZUH_MANAGER = `"$wazuhManager`"" | Set-Content $scriptPath
-            }
-            
-            & "$ScriptDir\windows-scripts\Install-WazuhAgent.ps1"
+            & "$ScriptDir\windows-scripts\Install-SplunkForwarder.ps1" -Quick
         }
         "2" {
             Write-Host "`n=== Password Generator ===" -ForegroundColor Magenta
@@ -269,7 +263,7 @@ function Invoke-QuickHarden {
     Write-Host "Next steps:" -ForegroundColor Yellow
     Write-Host "  1. Configure firewall ports" -ForegroundColor Gray
     Write-Host "  2. Change all user passwords" -ForegroundColor Gray
-    Write-Host "  3. Deploy Wazuh agent" -ForegroundColor Gray
+    Write-Host "  3. Deploy Splunk forwarder" -ForegroundColor Gray
     Write-Host ""
 }
 

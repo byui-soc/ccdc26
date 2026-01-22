@@ -16,7 +16,7 @@ Comprehensive PowerShell scripts for Windows system hardening, Active Directory 
 # Option 3: Run specific scripts
 .\hardening\Full-Harden.ps1      # Local system hardening
 .\hardening\AD-Harden.ps1        # Domain Controller hardening
-.\Install-WazuhAgent.ps1         # Wazuh agent setup
+.\Install-SplunkForwarder.ps1    # Splunk forwarder setup
 ```
 
 ## Directory Structure
@@ -30,8 +30,7 @@ windows-scripts/
 │       ├── common.ps1          # Shared utility functions
 │       ├── auditing.ps1        # Advanced audit configuration
 │       └── passwords.ps1       # Zulu-style password generation
-├── Install-WazuhAgent.ps1      # Wazuh agent setup (primary SIEM)
-├── Install-SplunkForwarder.ps1 # Splunk forwarder (backup SIEM)
+├── Install-SplunkForwarder.ps1 # Splunk forwarder for log collection
 └── README.md                   # This file
 ```
 
@@ -144,50 +143,33 @@ Comprehensive Windows auditing:
 - Firewall logging (all profiles)
 - Sysmon installation (optional)
 
-### Install-WazuhAgent.ps1
-
-Deploys Wazuh agent for centralized security monitoring:
-
-**Windows Event Logs Collected:**
-- Security (logons, auth, privilege use)
-- System
-- Application
-- PowerShell (script block logging)
-- Windows Defender
-- Windows Firewall
-- Sysmon (if installed)
-- Task Scheduler
-- Remote Desktop Services
-- DNS Server (if DC)
-- Active Directory (if DC)
-- IIS Logs (if present)
-
-**Additional Wazuh Features:**
-- File Integrity Monitoring (FIM)
-- Registry Monitoring
-- Rootkit Detection
-- System Inventory
-- CIS Benchmark Assessment
-
-**Setup:**
-```powershell
-# Edit the script to set WAZUH_MANAGER, or:
-.\Install-WazuhAgent.ps1
-# Enter manager IP when prompted
-```
-
 ### Install-SplunkForwarder.ps1
 
-Deploys Splunk Universal Forwarder as **backup SIEM** to the competition Splunk server (172.20.242.20):
+Deploys Splunk Universal Forwarder to the competition Splunk server (172.20.242.20):
+
+**Windows Event Logs Collected:**
+- Security (logons, auth, privilege use) → `windows-security`
+- System → `windows-system`
+- Application → `windows-application`
+- PowerShell (script block logging) → `windows-powershell`
+- Windows Defender → `windows-security`
+- Windows Firewall → `windows-security`
+- Sysmon (if installed) → `windows-sysmon`
+- Task Scheduler → `windows-security`
+- Remote Desktop Services → `windows-security`
+- DNS Server (if DC) → `windows-dns`
+- Active Directory (if DC) → `windows-security`
 
 **Setup:**
 ```powershell
+# Quick setup (recommended)
+.\Install-SplunkForwarder.ps1 -Quick
+
+# Or interactive menu
 .\Install-SplunkForwarder.ps1
-# Select option 1 for quick setup
+
 # Forwards to: 172.20.242.20:9997
 ```
-
-This provides redundancy alongside Wazuh.
 
 ## Priority Order During Competition
 
@@ -197,13 +179,13 @@ This provides redundancy alongside Wazuh.
 3. Change all passwords (use passwords.ps1 for consistency)
 
 ### Next 30 Minutes (Important)
-4. Deploy Wazuh agents
+4. Deploy Splunk forwarders
 5. Configure firewall ports
 6. Audit scheduled tasks
 7. Review privileged group membership
 
 ### Ongoing
-- Monitor Wazuh dashboards
+- Monitor Splunk dashboards
 - Re-audit for persistence
 - Respond to alerts
 

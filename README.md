@@ -97,8 +97,7 @@ sudo ./deploy.sh
 | **2) Test connectivity** | Ping all machines to verify Ansible can reach them |
 | **3) Password Reset** | Change ALL passwords on ALL machines + kick active sessions |
 | **4) Deploy Hardening** | Clone repo to all machines via git (optionally run hardening) |
-| **5) Deploy Wazuh Agents** | Install Wazuh agent on all machines |
-| **6) Deploy Splunk Forwarders** | Install Splunk forwarder on all machines |
+| **5) Deploy Splunk Forwarders** | Install Splunk forwarder on all machines |
 | **7) Gather Facts** | Collect system info from all machines |
 
 ---
@@ -156,9 +155,6 @@ cd C:\ccdc26\windows-scripts
 # Harden Domain Controller (AD-specific)
 .\hardening\AD-Harden.ps1 -q
 
-# Install Wazuh agent
-.\Install-WazuhAgent.ps1
-
 # Install Splunk forwarder
 .\Install-SplunkForwarder.ps1
 ```
@@ -169,8 +165,7 @@ cd C:\ccdc26\windows-scripts
 |--------|--------------|
 | `Full-Harden.ps1` | Patches CVEs (EternalBlue, PrintNightmare, Mimikatz), enables Defender ASR rules, disables dangerous services, removes backdoors |
 | `AD-Harden.ps1` | Domain Controller only: Zerologon/noPac patches, Kerberos hardening, privileged group cleanup, LDAP signing |
-| `Install-WazuhAgent.ps1` | Installs Wazuh agent for security monitoring |
-| `Install-SplunkForwarder.ps1` | Installs Splunk forwarder (backup SIEM) |
+| `Install-SplunkForwarder.ps1` | Installs Splunk forwarder for log collection |
 | `lib/passwords.ps1` | Generates deterministic passwords from username+salt |
 
 See [windows-scripts/README.md](windows-scripts/README.md) for full details.
@@ -196,7 +191,6 @@ ccdc26/
     │   ├── Full-Harden.ps1   # Main Windows hardening
     │   ├── AD-Harden.ps1     # Domain Controller hardening
     │   └── lib/              # Shared functions
-    ├── Install-WazuhAgent.ps1
     └── Install-SplunkForwarder.ps1
 ```
 

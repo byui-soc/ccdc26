@@ -91,9 +91,8 @@ Ansible runs commands on OTHER machines from this one. Requires SSH (Linux) or W
 | **2) Test connectivity** | Pings all machines to verify Ansible can reach them. Run this first! |
 | **3) Password Reset** | Prompts for ONE password, then: resets ALL user passwords on ALL machines, kills ALL active sessions (boots attackers) |
 | **4) Deploy Hardening** | Copies toolkit to all Linux machines. Option to also run hardening. |
-| **5) Deploy Wazuh Agents** | Installs Wazuh agent on all machines, pointing to your Wazuh server |
-| **6) Deploy Splunk Forwarders** | Installs Splunk forwarder on all machines → 172.20.242.20 |
-| **7) Gather Facts** | Collects system info from all machines, saves to files |
+| **5) Deploy Splunk Forwarders** | Installs Splunk forwarder on all machines → 172.20.242.20 |
+| **6) Gather Facts** | Collects system info from all machines, saves to files |
 
 ### Advanced Menu (Option 3)
 
@@ -101,13 +100,11 @@ Ansible runs commands on OTHER machines from this one. Requires SSH (Linux) or W
 |--------|--------------|
 | **1) Interactive Harden** | Run individual hardening scripts (users, ssh, firewall, etc.) |
 | **2) Service Hardening** | Harden specific services (web, mail, DNS, etc.) |
-| **3) Deploy Wazuh Agent** | Install Wazuh agent on THIS machine |
-| **4) Deploy Splunk Forwarder** | Install Splunk forwarder on THIS machine |
-| **5) Deploy Wazuh Server** | Install Wazuh server on THIS machine (use Ubuntu Wks) |
-| **6) Start Monitoring** | Start real-time file/process/network monitoring |
-| **7) Hunt for Persistence** | Scan for backdoors, cron jobs, startup scripts |
-| **8) Incident Response Tools** | Evidence collection, session killing, isolation |
-| **9) User Enumeration** | List all users, UID 0 accounts, sudo/wheel members, SSH keys, sudoers config |
+| **3) Deploy Splunk Forwarder** | Install Splunk forwarder on THIS machine |
+| **4) Start Monitoring** | Start real-time file/process/network monitoring |
+| **5) Hunt for Persistence** | Scan for backdoors, cron jobs, startup scripts |
+| **6) Incident Response Tools** | Evidence collection, session killing, isolation |
+| **7) User Enumeration** | List all users, UID 0 accounts, sudo/wheel members, SSH keys, sudoers config |
 
 ---
 
@@ -126,11 +123,8 @@ cd C:\ccdc26\windows-scripts
 # Harden Domain Controller (run on AD/DNS only)
 .\hardening\AD-Harden.ps1 -q
 
-# Install Wazuh agent
-.\Install-WazuhAgent.ps1
-
 # Install Splunk forwarder  
-.\Install-SplunkForwarder.ps1
+.\Install-SplunkForwarder.ps1 -Quick
 ```
 
 ### Script Reference
@@ -139,8 +133,7 @@ cd C:\ccdc26\windows-scripts
 |--------|---------|--------------|
 | `Full-Harden.ps1 -q` | Any Windows | Patches EternalBlue, PrintNightmare, Mimikatz. Enables Defender ASR rules. Disables dangerous services. Removes backdoors. |
 | `AD-Harden.ps1 -q` | Domain Controller only | Patches Zerologon, noPac. Hardens Kerberos. Cleans privileged groups. Enables LDAP signing. |
-| `Install-WazuhAgent.ps1` | Any Windows | Installs Wazuh agent, prompts for manager IP |
-| `Install-SplunkForwarder.ps1` | Any Windows | Installs Splunk forwarder → 172.20.242.20 |
+| `Install-SplunkForwarder.ps1 -Quick` | Any Windows | Installs Splunk forwarder → 172.20.242.20 |
 | `lib\passwords.ps1` | Any Windows | Generates deterministic passwords from username+salt |
 
 ### CVEs Patched

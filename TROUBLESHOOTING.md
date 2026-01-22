@@ -6,7 +6,7 @@ Common issues and solutions for the CCDC26 defense toolkit.
 
 1. [Network Connectivity Issues](#network-connectivity-issues)
 2. [Ansible Connection Problems](#ansible-connection-problems)
-3. [Wazuh Deployment Issues](#wazuh-deployment-issues)
+3. [Splunk Forwarder Issues](#splunk-forwarder-issues)
 4. [Windows WinRM Issues](#windows-winrm-issues)
 5. [OS Detection Problems](#os-detection-problems)
 
@@ -171,96 +171,81 @@ ssh sysadmin@172.20.242.30  # Type 'yes' when prompted
 
 ---
 
-## Wazuh Deployment Issues
+## Splunk Forwarder Issues
 
-### Problem: Wazuh agent cannot connect to manager
+### Problem: Splunk forwarder cannot connect to server
 
 **Symptoms**:
-- Agent installed but shows "Disconnected" status
-- Agent registration fails
-- No events in Wazuh dashboard
+- Forwarder installed but no data in Splunk
+- Connection refused errors in splunkd.log
 
 **Solutions**:
-1. **Test connectivity** (on agent host):
+1. **Test connectivity** (on forwarder host):
    ```bash
    # Linux:
-   nc -zv <manager-ip> 1514
-   nc -zv <manager-ip> 1515
+   nc -zv 172.20.242.20 9997
    
    # Windows:
-   Test-NetConnection -ComputerName <manager-ip> -Port 1514
+   Test-NetConnection -ComputerName 172.20.242.20 -Port 9997
    ```
 
 2. **Check firewall rules**:
-   - Linux: Allow outbound TCP 1514, 1515
-   - Windows: Allow outbound TCP 1514, 1515
-   - Manager: Allow inbound TCP 1514, 1515 from agent subnets
+   - Forwarder: Allow outbound TCP 9997
+   - Server: Allow inbound TCP 9997 from forwarder subnets
 
-3. **Verify manager is running**:
+3. **Verify server is receiving**:
    ```bash
-   # On Wazuh manager:
-   docker ps  # Should show wazuh-manager container
-   docker logs wazuh-manager  # Check for errors
+   # On Splunk server (172.20.242.20):
+   /opt/splunk/bin/splunk list forward-server -auth admin:changeme
+   ss -tlnp | grep 9997
    ```
 
-4. **Check agent configuration**:
+4. **Check forwarder configuration**:
    ```bash
    # Linux:
-   cat /var/ossec/etc/ossec.conf | grep -A3 "<server>"
+   cat /opt/splunkforwarder/etc/system/local/outputs.conf
    
    # Windows:
-   Get-Content "C:\Program Files (x86)\ossec-agent\ossec.conf" | Select-String -Pattern "server"
+   Get-Content "C:\Program Files\SplunkUniversalForwarder\etc\system\local\outputs.conf"
    ```
 
-5. **Manual agent registration** (if auto-registration fails):
-   ```bash
-   # On manager:
-   /var/ossec/bin/manage_agents
-   # Follow prompts to add agent
-   
-   # On agent:
-   /var/ossec/bin/manage_agents -i <key-from-manager>
-   ```
-
-### Problem: Wazuh Docker containers use too much memory
+### Problem: Splunk forwarder binary not found after installation
 
 **Symptoms**:
-- VMs become slow or unresponsive
-- Docker containers are killed (OOM)
-- `docker stats` shows high memory usage
+- Installation appears to complete but `/opt/splunkforwarder/bin/splunk` doesn't exist
+- Download fails silently
 
 **Solutions**:
-1. **Use lightweight compose file**:
+1. **Verify download URL** - The scripts use version 10.2.0 with build hash:
    ```bash
-   cd wazuh-content/docker
-   docker compose -f docker-compose.lightweight.yml up -d
-   ```
-   This uses only the manager (no indexer/dashboard) - requires ~1GB RAM.
-
-2. **Reduce JVM heap size** (already done in updated docker-compose.yml):
-   - Indexer: Reduced from 1g to 512m-1g
-   - Resource limits added
-
-3. **Monitor resource usage**:
-   ```bash
-   docker stats
-   free -h  # Check available memory
+   # Test URL directly:
+   curl -I "https://download.splunk.com/products/universalforwarder/releases/10.2.0/linux/splunkforwarder-10.2.0-d749cb17ea65-linux-amd64.tgz"
    ```
 
-### Problem: Wazuh agent installation fails on Oracle Linux
+2. **Manual installation**:
+   ```bash
+   cd /tmp
+   wget https://download.splunk.com/products/universalforwarder/releases/10.2.0/linux/splunkforwarder-10.2.0-d749cb17ea65-linux-amd64.tgz
+   tar -xzf splunkforwarder-10.2.0-d749cb17ea65-linux-amd64.tgz -C /opt/
+   ls -la /opt/splunkforwarder/bin/splunk  # Verify it exists
+   ```
+
+### Problem: Indexes not found on Splunk server
 
 **Symptoms**:
-- Playbook fails with "No package matching 'wazuh-agent'"
-- OS detection errors
+- Forwarders sending data but events show "index not found"
+- Data goes to default index
 
 **Solutions**:
-1. **The playbook now handles Oracle Linux** - it's detected as RHEL family and uses yum.
-
-2. **Manual installation** (if playbook fails):
+1. **Create indexes on server** (run on 172.20.242.20):
    ```bash
-   # On Oracle Linux host:
-   sudo rpm --import https://packages.wazuh.com/key/GPG-KEY-WAZUH
-   sudo yum install -y wazuh-agent
+   cd /opt/ccdc26/linux-scripts/tools
+   ./splunk-server.sh indexes
+   ```
+
+2. **Verify indexes exist**:
+   ```bash
+   /opt/splunk/bin/splunk list index -auth admin:changeme | grep -E "linux-|windows-"
    ```
 
 ---
@@ -370,19 +355,19 @@ ansible linux -i ansible/inventory.ini -m ping
 ansible-playbook -i ansible/inventory.ini ansible/test-network-connectivity.yml
 ```
 
-### Check Wazuh status:
+### Check Splunk forwarder status:
 ```bash
-# On manager:
-docker ps | grep wazuh
-docker logs wazuh-manager --tail 50
+# On forwarder (Linux):
+/opt/splunkforwarder/bin/splunk status
+tail -f /opt/splunkforwarder/var/log/splunk/splunkd.log
 
-# On agent (Linux):
-sudo systemctl status wazuh-agent
-sudo tail -f /var/ossec/logs/ossec.log
+# On forwarder (Windows):
+Get-Service SplunkForwarder
+& "C:\Program Files\SplunkUniversalForwarder\bin\splunk.exe" status
 
-# On agent (Windows):
-Get-Service WazuhSvc
-Get-Content "C:\Program Files (x86)\ossec-agent\ossec.log" -Tail 50
+# On server (172.20.242.20):
+/opt/splunk/bin/splunk list forward-server -auth admin:changeme
+/opt/splunk/bin/splunk search "index=linux-* | stats count by host" -auth admin:changeme
 ```
 
 ### Check firewall rules:
@@ -405,7 +390,7 @@ If issues persist:
 
 1. Check logs:
    - Ansible: Add `-v` or `-vvv` for verbose output
-   - Wazuh: Check agent and manager logs
+   - Splunk: Check `/opt/splunkforwarder/var/log/splunk/splunkd.log` (Linux) or `C:\Program Files\SplunkUniversalForwarder\var\log\splunk\splunkd.log` (Windows)
    - System: Check `/var/log/` (Linux) or Event Viewer (Windows)
 
 2. Run diagnostics:
@@ -417,4 +402,4 @@ If issues persist:
 3. Review documentation:
    - [README.md](README.md) - Main documentation
    - [ansible/README.md](ansible/README.md) - Ansible-specific docs
-   - [wazuh-content/README.md](wazuh-content/README.md) - Wazuh docs
+   - [QUICKREF.md](QUICKREF.md) - Quick reference for competition

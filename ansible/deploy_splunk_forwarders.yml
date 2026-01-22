@@ -1,6 +1,6 @@
 ---
 # CCDC26 - Deploy Splunk Forwarders to Competition Splunk Server
-# Backup SIEM forwarding (primary is Wazuh)
+# Competition SIEM for log collection and analysis
 #
 # Usage:
 #   ansible-playbook -i inventory.ini deploy_splunk_forwarders.yml

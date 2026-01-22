@@ -8,12 +8,10 @@ team_number: 2
 new_password: "CHANGE_ME_NOW!"  # Set your competition password
 
 ###############################################################################
-# WAZUH CONFIGURATION
+# SPLUNK CONFIGURATION
 ###############################################################################
-# Deploy Wazuh server on Ubuntu Workstation (DHCP - update with actual IP!)
-wazuh_manager: "DHCP_UPDATE_ME"
-wazuh_registration_password: ""
-wazuh_agent_group: "ccdc"
+splunk_server: "172.20.242.20"
+splunk_port: "9997"
 
 ###############################################################################
 # DEFAULT CREDENTIALS (for reference - change immediately!)

@@ -125,15 +125,13 @@ advanced_menu() {
     echo "  2) Service Hardening      - Harden specific services (web, mail, DNS)"
     echo ""
     echo "SIEM/Monitoring:"
-    echo "  3) Deploy Wazuh Agent     - Install Wazuh agent on THIS machine"
-    echo "  4) Deploy Splunk Forwarder- Install Splunk forwarder on THIS machine"
-    echo "  5) Deploy Wazuh Server    - Install Wazuh server on THIS machine (use on Ubuntu Wks)"
-    echo "  6) Start Monitoring       - Real-time file/process/network monitoring"
+    echo "  3) Deploy Splunk Forwarder- Install Splunk forwarder on THIS machine"
+    echo "  4) Start Monitoring       - Real-time file/process/network monitoring"
     echo ""
     echo "Security:"
-    echo "  7) Hunt for Persistence   - Scan for backdoors, cron jobs, startup scripts"
-    echo "  8) Incident Response      - Evidence collection, session killing, isolation"
-    echo "  9) User Enumeration       - List users, permissions, sudo access, SSH keys"
+    echo "  5) Hunt for Persistence   - Scan for backdoors, cron jobs, startup scripts"
+    echo "  6) Incident Response      - Evidence collection, session killing, isolation"
+    echo "  7) User Enumeration       - List users, permissions, sudo access, SSH keys"
     echo ""
     echo "0) Back to main menu"
     echo ""
@@ -181,34 +179,12 @@ advanced_menu() {
                 error "Must be root. Run: sudo $0"
                 return
             fi
-            header "Deploying Wazuh Agent (Primary SIEM)"
-            read -p "Enter Wazuh manager IP: " wazuh_ip
-            if [ -n "$wazuh_ip" ]; then
-                sed -i "s/WAZUH_MANAGER=.*/WAZUH_MANAGER=\"$wazuh_ip\"/" "$SCRIPT_DIR/linux-scripts/tools/wazuh-agent.sh"
-            fi
-            cd "$SCRIPT_DIR/linux-scripts/tools"
-            bash ./wazuh-agent.sh
-            ;;
-        4)
-            if [ "$IS_ROOT" != true ]; then
-                error "Must be root. Run: sudo $0"
-                return
-            fi
-            header "Deploying Splunk Forwarder (Backup SIEM)"
+            header "Deploying Splunk Forwarder"
             info "Forwarding to competition Splunk server: 172.20.242.20:9997"
             cd "$SCRIPT_DIR/linux-scripts/tools"
             bash ./splunk-forwarder.sh
             ;;
-        5)
-            if [ "$IS_ROOT" != true ]; then
-                error "Must be root. Run: sudo $0"
-                return
-            fi
-            header "Deploying Wazuh Server"
-            cd "$SCRIPT_DIR/linux-scripts/tools"
-            bash ./wazuh-server.sh
-            ;;
-        6)
+        4)
             if [ "$IS_ROOT" != true ]; then
                 error "Must be root. Run: sudo $0"
                 return
@@ -217,7 +193,7 @@ advanced_menu() {
             cd "$SCRIPT_DIR/linux-scripts/monitoring"
             bash ./deploy-monitoring.sh
             ;;
-        7)
+        5)
             if [ "$IS_ROOT" != true ]; then
                 error "Must be root. Run: sudo $0"
                 return
@@ -226,7 +202,7 @@ advanced_menu() {
             cd "$SCRIPT_DIR/linux-scripts/persistence-hunting"
             bash ./full-hunt.sh
             ;;
-        8)
+        6)
             if [ "$IS_ROOT" != true ]; then
                 error "Must be root. Run: sudo $0"
                 return
@@ -241,7 +217,7 @@ advanced_menu() {
                 bash "./$ir_script"
             fi
             ;;
-        9)
+        7)
             if [ "$IS_ROOT" != true ]; then
                 error "Must be root. Run: sudo $0"
                 return
@@ -343,11 +319,10 @@ ansible_menu() {
     echo "2) Test connectivity               - Verify Ansible can reach all machines (run first!)"
     echo "3) Password Reset + Kick Sessions  - Change ALL passwords, create ccdcuser1/2, boot attackers"
     echo "4) Deploy Hardening Scripts        - Copy toolkit to all machines (option to run)"
-    echo "5) Deploy Wazuh Agents             - Install Wazuh agent on all machines"
-    echo "6) Deploy Splunk Forwarders        - Install Splunk forwarder on all machines"
-    echo "7) Gather Facts                    - Collect system info from all machines"
-    echo "8) Run custom playbook"
-    echo "9) Change auth mode                - Switch between prompt/inventory auth"
+    echo "5) Deploy Splunk Forwarders        - Install Splunk forwarder on all machines"
+    echo "6) Gather Facts                    - Collect system info from all machines"
+    echo "7) Run custom playbook"
+    echo "8) Change auth mode                - Switch between prompt/inventory auth"
     echo ""
     echo "0) Back to main menu"
     echo ""
@@ -438,25 +413,16 @@ ansible_menu() {
             esac
             ;;
         5)
-            header "Deploy Wazuh Agents (Primary SIEM)"
-            read -p "Enter Wazuh manager IP: " wazuh_ip
-            if [ -n "$wazuh_ip" ]; then
-                ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/deploy_wazuh.yml" -e "wazuh_manager=$wazuh_ip" $ANSIBLE_EXTRA_ARGS
-            else
-                error "Wazuh manager IP required"
-            fi
-            ;;
-        6)
-            header "Deploy Splunk Forwarders (Backup SIEM)"
+            header "Deploy Splunk Forwarders"
             info "Forwarding to competition Splunk server: 172.20.242.20:9997"
             ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/deploy_splunk_forwarders.yml" $ANSIBLE_EXTRA_ARGS
             ;;
-        7)
+        6)
             header "Gathering Facts"
             ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/gather_facts.yml" $ANSIBLE_EXTRA_ARGS
             success "Facts saved to: $ANSIBLE_DIR/collected_facts/"
             ;;
-        8)
+        7)
             header "Run Custom Playbook"
             read -p "Enter playbook path: " playbook
             if [ -f "$playbook" ]; then
@@ -465,7 +431,7 @@ ansible_menu() {
                 error "Playbook not found: $playbook"
             fi
             ;;
-        9)
+        8)
             ANSIBLE_AUTH_CONFIGURED=""
             setup_ansible_auth
             ANSIBLE_AUTH_CONFIGURED=true

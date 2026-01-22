@@ -344,7 +344,7 @@ function Install-Sysmon {
     <HashAlgorithms>md5,sha256,IMPHASH</HashAlgorithms>
     <EventFiltering>
         <ProcessCreate onmatch="exclude">
-            <Image condition="end with">wazuh-agent.exe</Image>
+            <Image condition="end with">splunk.exe</Image>
         </ProcessCreate>
         <FileCreateTime onmatch="include" />
         <NetworkConnect onmatch="include" />
