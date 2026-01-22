@@ -545,6 +545,12 @@ quick_setup_docker() {
     mkdir -p "$wazuh_dir"
     cd "$wazuh_dir"
 
+    # Clean up any existing problematic config/certs.yml if it's a directory
+    if [ -d "config/certs.yml" ]; then
+        warn "Removing existing config/certs.yml directory (from previous failed run)"
+        rm -rf "config/certs.yml"
+    fi
+
     # Try to use local wazuh-content directory from repository (preferred)
     local script_dir="$(dirname "$0")"
     local repo_root="$(cd "$script_dir/../.." && pwd)"
@@ -552,7 +558,32 @@ quick_setup_docker() {
     
     if [ -d "$local_wazuh_docker" ] && [ -f "$local_wazuh_docker/docker-compose.yml" ]; then
         info "Using local Wazuh Docker configuration from repository"
+        # Copy files carefully, ensuring certs.yml is a file
         cp -r "$local_wazuh_docker"/* "$wazuh_dir/"
+        # Verify certs.yml is a file, not a directory
+        if [ -d "config/certs.yml" ]; then
+            warn "config/certs.yml is a directory, fixing..."
+            rm -rf "config/certs.yml"
+            # Recreate from local source if it exists
+            if [ -f "$local_wazuh_docker/config/certs.yml" ]; then
+                cp "$local_wazuh_docker/config/certs.yml" "config/certs.yml"
+            else
+                # Create default certs.yml
+                cat > config/certs.yml << EOF
+# Wazuh Certificate Configuration
+nodes:
+  indexer:
+    - name: wazuh.indexer
+      ip: "$WAZUH_MANAGER_IP"
+  server:
+    - name: wazuh.manager
+      ip: "$WAZUH_MANAGER_IP"
+  dashboard:
+    - name: wazuh.dashboard
+      ip: "$WAZUH_MANAGER_IP"
+EOF
+            fi
+        fi
         success "Copied local Docker configuration files"
     else
         # Fallback: Download official docker-compose
@@ -566,6 +597,10 @@ quick_setup_docker() {
         
         # Create config directory and certs.yml file (required for certificate generation)
         mkdir -p config
+        # Ensure we're creating a file, not a directory
+        if [ -d "config/certs.yml" ]; then
+            rm -rf "config/certs.yml"
+        fi
         cat > config/certs.yml << EOF
 # Wazuh Certificate Configuration
 nodes:
@@ -582,8 +617,12 @@ EOF
         info "Created certs.yml configuration file"
     fi
 
-    # Ensure config directory exists
+    # Ensure config directory exists and certs.yml is a file
     mkdir -p config/wazuh_indexer_ssl_certs
+    if [ ! -f "config/certs.yml" ]; then
+        error "config/certs.yml file not found or is not a regular file"
+        return 1
+    fi
 
     # Generate certificates
     info "Generating SSL certificates..."
