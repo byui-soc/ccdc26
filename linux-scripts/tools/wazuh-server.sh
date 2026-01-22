@@ -507,6 +507,40 @@ quick_setup_docker() {
         return 1
     fi
 
+    # Check if Docker daemon is running
+    if ! docker info &>/dev/null; then
+        warn "Docker daemon is not running. Attempting to start..."
+        if systemctl is-active --quiet docker; then
+            error "Docker service is active but daemon is not responding"
+            error "Check Docker logs: journalctl -u docker"
+            return 1
+        else
+            info "Starting Docker service..."
+            systemctl start docker
+            systemctl enable docker
+            
+            # Wait for Docker to be ready
+            local retries=0
+            while ! docker info &>/dev/null && [ $retries -lt 10 ]; do
+                sleep 1
+                retries=$((retries + 1))
+            done
+            
+            if ! docker info &>/dev/null; then
+                error "Failed to start Docker daemon"
+                error "Try manually: systemctl start docker"
+                return 1
+            fi
+            success "Docker daemon started"
+        fi
+    fi
+
+    # Verify Docker socket permissions
+    if [ ! -S /var/run/docker.sock ]; then
+        error "Docker socket not found at /var/run/docker.sock"
+        return 1
+    fi
+
     local wazuh_dir="/opt/wazuh-docker"
     mkdir -p "$wazuh_dir"
     cd "$wazuh_dir"
@@ -516,13 +550,32 @@ quick_setup_docker() {
     curl -sO https://raw.githubusercontent.com/wazuh/wazuh-docker/v$WAZUH_VERSION/single-node/docker-compose.yml
 
     # Generate certificates
+    info "Downloading certificate generation script..."
     curl -sO https://raw.githubusercontent.com/wazuh/wazuh-docker/v$WAZUH_VERSION/single-node/generate-indexer-certs.yml
-    docker compose -f generate-indexer-certs.yml run --rm generator 2>/dev/null || \
-        docker-compose -f generate-indexer-certs.yml run --rm generator
+    
+    info "Generating SSL certificates..."
+    if docker compose -f generate-indexer-certs.yml run --rm generator 2>/dev/null; then
+        success "Certificates generated"
+    elif docker-compose -f generate-indexer-certs.yml run --rm generator 2>/dev/null; then
+        success "Certificates generated"
+    else
+        error "Failed to generate certificates"
+        error "Check Docker daemon: systemctl status docker"
+        return 1
+    fi
 
     # Start Wazuh
     info "Starting Wazuh containers..."
-    docker compose up -d 2>/dev/null || docker-compose up -d
+    if docker compose up -d 2>/dev/null; then
+        success "Containers started"
+    elif docker-compose up -d 2>/dev/null; then
+        success "Containers started"
+    else
+        error "Failed to start containers"
+        error "Check Docker daemon: systemctl status docker"
+        error "Check Docker logs: journalctl -u docker"
+        return 1
+    fi
 
     # Wait for startup
     info "Waiting for services to start (this may take 2-3 minutes)..."
