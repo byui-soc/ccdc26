@@ -1,5 +1,3 @@
-<img width="440" height="68" alt="image" src="https://github.com/user-attachments/assets/07e35ba9-b98d-4ddf-b178-5dbed06bc89a" /># CCDC26 Quick Reference
-
 **Team 2 (BYU)** | **Date:** Jan 24, 2026 | **Drop Flag:** 9am MST
 
 ---
