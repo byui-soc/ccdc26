@@ -64,11 +64,10 @@
         - ansible_os_family == "RedHat"
       register: rpm_download
 
-    - name: Install Splunk UF on RHEL/CentOS
-      yum:
-        name: /tmp/splunk_install/splunkforwarder.rpm
-        state: present
-        disable_gpg_check: yes
+    - name: Install Splunk UF on RHEL/CentOS/Fedora
+      shell: rpm -i /tmp/splunk_install/splunkforwarder.rpm
+      args:
+        creates: "{{ splunk_home }}/bin/splunk"
       when: 
         - not splunk_installed.stat.exists
         - ansible_os_family == "RedHat"
