@@ -23,18 +23,30 @@
     run_monitoring: false
 
   tasks:
-    - name: Ensure git is installed (Debian/Ubuntu)
+    - name: Ensure git and unzip are installed (Debian/Ubuntu)
       apt:
-        name: git
+        name:
+          - git
+          - unzip
         state: present
         update_cache: yes
       when: ansible_pkg_mgr == 'apt'
 
-    - name: Ensure git is installed (RHEL/CentOS/Fedora)
-      yum:
-        name: git
-        state: present
-      when: ansible_pkg_mgr == 'yum' or ansible_pkg_mgr == 'dnf'
+    - name: Ensure git and unzip are installed (RHEL/CentOS/Fedora)
+      shell: |
+        if command -v dnf &>/dev/null; then
+          dnf install -y git unzip
+        elif command -v yum &>/dev/null; then
+          yum install -y git unzip
+        fi
+      when: ansible_os_family == 'RedHat'
+      ignore_errors: yes
+
+    - name: Create toolkit directory
+      file:
+        path: "{{ toolkit_dest }}"
+        state: directory
+        mode: '0755'
 
     - name: Clone or update repository
       git:
@@ -46,19 +58,35 @@
       register: git_result
       ignore_errors: yes
 
-    - name: Fallback to archive method if git fails
-      unarchive:
-        src: "{{ (repo_url | default(default_repo_url)) | replace('.git', '') }}/archive/{{ repo_branch | default(default_repo_branch) }}.zip"
-        dest: "{{ toolkit_dest }}"
-        remote_src: yes
-        creates: "{{ toolkit_dest }}/linux-scripts"
+    - name: Download archive if git fails
+      get_url:
+        url: "{{ (repo_url | default(default_repo_url)) | replace('.git', '') }}/archive/refs/heads/{{ repo_branch | default(default_repo_branch) }}.zip"
+        dest: "/tmp/ccdc26.zip"
+        mode: '0644'
       when: git_result is failed
+      register: download_result
       ignore_errors: yes
+
+    - name: Extract archive if git fails
+      shell: |
+        cd /tmp
+        unzip -o ccdc26.zip
+        rm -rf {{ toolkit_dest }}/*
+        cp -r ccdc26-{{ repo_branch | default(default_repo_branch) }}/* {{ toolkit_dest }}/
+        rm -rf ccdc26-{{ repo_branch | default(default_repo_branch) }} ccdc26.zip
+      when: git_result is failed and download_result is succeeded
+      ignore_errors: yes
+
+    - name: Check if linux-scripts exists
+      stat:
+        path: "{{ toolkit_dest }}/linux-scripts"
+      register: scripts_dir
 
     - name: Make all scripts executable
       shell: |
         find {{ toolkit_dest }}/linux-scripts -name "*.sh" -exec chmod +x {} \;
       changed_when: true
+      when: scripts_dir.stat.exists
 
     - name: Run full hardening (if enabled)
       shell: |
