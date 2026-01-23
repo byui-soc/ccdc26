@@ -234,10 +234,11 @@
         mode: '0600'
 
     - name: Check if Splunk forwarder is already running
-      shell: "{{ splunk_home }}/bin/splunk status"
+      shell: "timeout 10 {{ splunk_home }}/bin/splunk status || echo 'not running'"
       register: splunk_status_check
       ignore_errors: yes
       changed_when: false
+      when: splunk_binary_check.stat.exists
 
     - name: Check if systemd unit file exists
       stat:
@@ -249,27 +250,33 @@
         {{ splunk_home }}/bin/splunk start --accept-license --answer-yes --no-prompt
       register: splunk_start_result
       when: 
-        - splunk_status_check.rc != 0 or 'splunkd is not running' in splunk_status_check.stdout | default('')
+        - splunk_binary_check.stat.exists
+        - splunk_status_check is skipped or splunk_status_check.rc != 0 or 'splunkd is not running' in splunk_status_check.stdout | default('') or 'not running' in splunk_status_check.stdout | default('')
 
     - name: Enable boot-start (only if unit file doesn't exist)
       shell: |
         {{ splunk_home }}/bin/splunk enable boot-start -systemd-managed 1 --accept-license --answer-yes --no-prompt || \
         {{ splunk_home }}/bin/splunk enable boot-start --accept-license --answer-yes --no-prompt
-      when: not splunk_systemd_unit.stat.exists
+      when: 
+        - splunk_binary_check.stat.exists
+        - not splunk_systemd_unit.stat.exists
       ignore_errors: yes
 
     - name: Ensure SplunkForwarder service is started via systemd
       shell: |
         systemctl daemon-reload
         systemctl start SplunkForwarder || true
-      when: splunk_systemd_unit.stat.exists
+      when: 
+        - splunk_binary_check.stat.exists
+        - splunk_systemd_unit.stat.exists
       ignore_errors: yes
 
     - name: Verify Splunk forwarder is running
-      shell: "{{ splunk_home }}/bin/splunk status"
+      shell: "timeout 10 {{ splunk_home }}/bin/splunk status"
       register: splunk_status
       changed_when: false
       failed_when: "'splunkd is running' not in splunk_status.stdout"
+      when: splunk_binary_check.stat.exists
 
     - name: Clean up temp directory
       file:
