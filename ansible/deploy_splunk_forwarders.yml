@@ -8,7 +8,7 @@
 # Competition Splunk Server: 172.20.242.20:9997
 
 - name: Deploy Splunk forwarder to Linux hosts
-  hosts: linux
+  hosts: linux_forwarders
   become: yes
   gather_facts: yes
   vars:
@@ -284,7 +284,7 @@
         state: absent
 
 - name: Deploy Splunk forwarder to Windows hosts
-  hosts: windows
+  hosts: windows_forwarders
   gather_facts: yes
   vars:
     splunk_server: "172.20.242.20"
