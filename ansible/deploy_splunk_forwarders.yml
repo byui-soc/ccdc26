@@ -36,6 +36,7 @@
         url: "https://download.splunk.com/products/universalforwarder/releases/{{ splunk_version }}/linux/splunkforwarder-{{ splunk_version }}-{{ splunk_build }}-linux-amd64.deb"
         dest: /tmp/splunk_install/splunkforwarder.deb
         mode: '0644'
+        timeout: 120
       when: 
         - not splunk_installed.stat.exists
         - ansible_os_family == "Debian"
@@ -51,12 +52,13 @@
         - deb_download is succeeded
       register: deb_install
 
-    # RHEL/CentOS installation
-    - name: Download Splunk UF for RHEL/CentOS
+    # RHEL/CentOS/Fedora installation
+    - name: Download Splunk UF for RHEL/CentOS/Fedora
       get_url:
-        url: "https://download.splunk.com/products/universalforwarder/releases/{{ splunk_version }}/linux/splunkforwarder-{{ splunk_version }}-{{ splunk_build }}-linux-amd64.rpm"
+        url: "https://download.splunk.com/products/universalforwarder/releases/{{ splunk_version }}/linux/splunkforwarder-{{ splunk_version }}-{{ splunk_build }}.x86_64.rpm"
         dest: /tmp/splunk_install/splunkforwarder.rpm
         mode: '0644'
+        timeout: 120
       when: 
         - not splunk_installed.stat.exists
         - ansible_os_family == "RedHat"
@@ -258,12 +260,11 @@
       ignore_errors: yes
 
     - name: Ensure SplunkForwarder service is started via systemd
-      systemd:
-        name: SplunkForwarder
-        state: started
-        enabled: yes
-      ignore_errors: yes
+      shell: |
+        systemctl daemon-reload
+        systemctl start SplunkForwarder || true
       when: splunk_systemd_unit.stat.exists
+      ignore_errors: yes
 
     - name: Verify Splunk forwarder is running
       shell: "{{ splunk_home }}/bin/splunk status"

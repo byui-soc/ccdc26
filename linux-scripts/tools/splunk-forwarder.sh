@@ -18,9 +18,9 @@ SPLUNK_BUILD="d749cb17ea65"
 SPLUNK_HOME="/opt/splunkforwarder"
 SPLUNK_USER="splunkfwd"
 
-# Download URLs with build hash (verified working without authentication)
+# Download URLs with build hash (verified working)
 SPLUNK_DEB_URL="https://download.splunk.com/products/universalforwarder/releases/${SPLUNK_VERSION}/linux/splunkforwarder-${SPLUNK_VERSION}-${SPLUNK_BUILD}-linux-amd64.deb"
-SPLUNK_RPM_URL="https://download.splunk.com/products/universalforwarder/releases/${SPLUNK_VERSION}/linux/splunkforwarder-${SPLUNK_VERSION}-${SPLUNK_BUILD}-linux-amd64.rpm"
+SPLUNK_RPM_URL="https://download.splunk.com/products/universalforwarder/releases/${SPLUNK_VERSION}/linux/splunkforwarder-${SPLUNK_VERSION}-${SPLUNK_BUILD}.x86_64.rpm"
 SPLUNK_TGZ_URL="https://download.splunk.com/products/universalforwarder/releases/${SPLUNK_VERSION}/linux/splunkforwarder-${SPLUNK_VERSION}-${SPLUNK_BUILD}-linux-amd64.tgz"
 
 check_installed() {
