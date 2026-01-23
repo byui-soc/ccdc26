@@ -44,14 +44,9 @@ function Get-Environment {
 #=============================================================================
 function Show-Banner {
     Write-Host ""
-    Write-Host "  ██████╗ ██████╗██████╗  ██████╗██████╗  ██████╗ " -ForegroundColor Cyan
-    Write-Host " ██╔════╝██╔════╝██╔══██╗██╔════╝╚════██╗██╔════╝ " -ForegroundColor Cyan
-    Write-Host " ██║     ██║     ██║  ██║██║      █████╔╝███████╗ " -ForegroundColor Cyan
-    Write-Host " ██║     ██║     ██║  ██║██║     ██╔═══╝ ██╔═══██╗" -ForegroundColor Cyan
-    Write-Host " ╚██████╗╚██████╗██████╔╝╚██████╗███████╗╚██████╔╝" -ForegroundColor Cyan
-    Write-Host "  ╚═════╝ ╚═════╝╚═════╝  ╚═════╝╚══════╝ ╚═════╝ " -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "CCDC26 Windows Defense Toolkit" -ForegroundColor White
+    Write-Host "============================================" -ForegroundColor Cyan
+    Write-Host "           CCDC26 Windows Toolkit           " -ForegroundColor Cyan
+    Write-Host "============================================" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "OS:          " -NoNewline; Write-Host $OSName -ForegroundColor Green
     Write-Host "Computer:    " -NoNewline; Write-Host $ComputerName -ForegroundColor Green
