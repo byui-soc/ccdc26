@@ -1,8 +1,6 @@
 # CCDC26 Defense Toolkit
 
-Hardening, monitoring, and incident response scripts for CCDC 2026. Supports Linux and Windows systems with centralized management via Ansible.
-
-**Competition Day?** See [QUICKREF.md](QUICKREF.md) for credentials, commands, and what each option does.
+Hardening, monitoring, and incident response scripts for CCDC. Supports Linux and Windows systems with centralized management via Ansible.
 
 ---
 
@@ -18,28 +16,6 @@ sudo dnf install -y git python3-pip sshpass && pip3 install ansible pywinrm
 sudo apt install -y git python3-pip sshpass && pip3 install ansible pywinrm
 ```
 
-### Network Requirements
-
-**IMPORTANT**: For Ansible to manage Windows hosts from Linux, you must configure:
-
-1. **Windows Firewall** (on each Windows host):
-   ```powershell
-   # Run as Administrator on each Windows machine:
-   cd C:\ccdc26\windows-scripts
-   .\Setup-WinRM-Ansible.ps1
-   ```
-   This allows Linux subnet (172.20.242.0/24) to connect via WinRM (port 5985).
-
-2. **Cisco FTD Firewall** (manual configuration required):
-   - Allow traffic from Linux subnet (172.20.242.0/24) to Windows subnet (172.20.240.0/24)
-   - Required ports: TCP 5985 (WinRM), ICMP (ping)
-   - Access FTD via browser: https://172.20.240.200 from Windows hosts
-
-3. **Test connectivity**:
-   ```bash
-   # From Ansible controller:
-   ansible-playbook -i ansible/inventory.ini ansible/test-network-connectivity.yml
-   ```
 
 ---
 
@@ -100,24 +76,7 @@ sudo ./deploy.sh
 | **5) Deploy Splunk Forwarders** | Install Splunk forwarder on all machines |
 | **7) Gather Facts** | Collect system info from all machines |
 
----
 
-## How Ansible Works
-
-```
-Your Machine (Controller)          Other Machines (Targets)
-┌─────────────────────┐            ┌─────────────────┐
-│  ./deploy.sh        │    SSH     │  Ubuntu Ecom    │
-│  Option 2: Ansible  │───────────>│  172.20.242.30  │
-│                     │            └─────────────────┘
-│  Reads inventory.ini│    SSH     ┌─────────────────┐
-│  Runs playbooks     │───────────>│  Fedora Webmail │
-│                     │            │  172.20.242.40  │
-└─────────────────────┘            └─────────────────┘
-                           WinRM   ┌─────────────────┐
-                       ───────────>│  Windows AD/DNS │
-                                   │  172.20.240.102 │
-                                   └─────────────────┘
 ```
 
 - **Controller**: The machine where you run `./deploy.sh` and select Ansible options
