@@ -27,10 +27,10 @@ sudo apt install -y git python3-pip sshpass && pip3 install ansible pywinrm
 
 ```bash
 # Clone and deploy in one step
-sudo ./deploy-standalone.sh --repo-url https://github.com/YOUR_REPO/ccdc26.git
+sudo ./deploy-standalone.sh --repo-url https://github.com/byui-soc/ccdc26.git
 
 # Or clone manually, then run
-git clone https://github.com/YOUR_REPO/ccdc26.git /opt/ccdc26
+git clone https://github.com/byui-soc/ccdc26.git /opt/ccdc26
 cd /opt/ccdc26
 sudo ./deploy.sh
 ```
@@ -41,7 +41,7 @@ sudo ./deploy.sh
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/YOUR_REPO/ccdc26.git /opt/ccdc26
+git clone https://github.com/byui-soc/ccdc26.git /opt/ccdc26
 cd /opt/ccdc26
 
 # 2. Run the toolkit

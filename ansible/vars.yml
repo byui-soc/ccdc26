@@ -40,7 +40,7 @@ competition_users:
 # TOOLKIT DEPLOYMENT
 ###############################################################################
 # Repository URL for git-based deployment (update with your actual repo)
-repo_url: "https://github.com/YOUR_REPO/ccdc26.git"
+repo_url: "https://github.com/byui-soc/ccdc26.git"
 repo_branch: "main"
 toolkit_dest: "/opt/ccdc26"
 windows_toolkit_dest: "C:\\ccdc26"

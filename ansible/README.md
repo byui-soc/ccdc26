@@ -114,7 +114,7 @@ ansible-playbook -i inventory.ini deploy_hardening.yml
 ansible-playbook -i inventory.ini deploy_hardening.yml -e "run_full=true"
 
 # Specify custom repository URL
-ansible-playbook -i inventory.ini deploy_hardening.yml -e "repo_url=https://github.com/YOUR_REPO/ccdc26.git"
+ansible-playbook -i inventory.ini deploy_hardening.yml -e "repo_url=https://github.com/byui-soc/ccdc26.git"
 
 # Deploy to specific hosts only
 ansible-playbook -i inventory.ini deploy_hardening.yml --limit ecom,webmail
@@ -214,7 +214,7 @@ Each host can deploy itself:
 
 ```bash
 # On any Linux host:
-sudo ./deploy-standalone.sh --repo-url https://github.com/YOUR_REPO/ccdc26.git
+sudo ./deploy-standalone.sh --repo-url https://github.com/byui-soc/ccdc26.git
 ```
 
 This clones the repo and makes scripts executable. No Ansible needed.
@@ -223,7 +223,7 @@ This clones the repo and makes scripts executable. No Ansible needed.
 
 ```bash
 # On any Linux host:
-git clone https://github.com/YOUR_REPO/ccdc26.git /opt/ccdc26
+git clone https://github.com/byui-soc/ccdc26.git /opt/ccdc26
 cd /opt/ccdc26/linux-scripts
 sudo ./hardening/full-harden.sh
 ```

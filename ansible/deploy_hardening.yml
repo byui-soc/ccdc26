@@ -16,7 +16,7 @@
 
   vars:
     toolkit_dest: "/opt/ccdc26"
-    repo_url: "{{ repo_url | default('https://github.com/YOUR_REPO/ccdc26.git') }}"
+    repo_url: "{{ repo_url | default('https://github.com/byui-soc/ccdc26.git') }}"
     repo_branch: "{{ repo_branch | default('main') }}"
     run_full: false
     run_services: false
@@ -135,7 +135,7 @@
 
   vars:
     toolkit_dest: "C:\\ccdc26"
-    repo_url: "{{ repo_url | default('https://github.com/YOUR_REPO/ccdc26.git') }}"
+    repo_url: "{{ repo_url | default('https://github.com/byui-soc/ccdc26.git') }}"
     repo_branch: "{{ repo_branch | default('main') }}"
     run_full: false
 

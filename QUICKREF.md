@@ -179,7 +179,7 @@ YOUR MACHINE (Controller)              TARGET MACHINES
 # 2. Install prerequisites + clone toolkit
 sudo dnf install -y git python3-pip   # Fedora
 pip3 install ansible pywinrm
-git clone https://github.com/YOUR_REPO/ccdc26.git /opt/ccdc26
+git clone https://github.com/byui-soc/ccdc26.git /opt/ccdc26
 cd /opt/ccdc26
 
 # 3. Change all passwords on all machines (Ansible)

@@ -7,7 +7,7 @@
 #
 # Usage:
 #   sudo ./deploy-standalone.sh
-#   sudo ./deploy-standalone.sh --repo-url https://github.com/YOUR_REPO/ccdc26.git
+#   sudo ./deploy-standalone.sh --repo-url https://github.com/byui-soc/ccdc26.git
 #   sudo ./deploy-standalone.sh --run-hardening
 #=============================================================================
 
@@ -15,7 +15,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOLKIT_DEST="/opt/ccdc26"
-REPO_URL="${REPO_URL:-https://github.com/YOUR_REPO/ccdc26.git}"
+REPO_URL="${REPO_URL:-https://github.com/byui-soc/ccdc26.git}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 RUN_HARDENING=false
 
