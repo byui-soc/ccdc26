@@ -232,17 +232,44 @@
           index = linux-ftp
         mode: '0600'
 
-    - name: Accept license and start Splunk forwarder
+    - name: Check if Splunk forwarder is already running
+      shell: "{{ splunk_home }}/bin/splunk status"
+      register: splunk_status_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Check if systemd unit file exists
+      stat:
+        path: /etc/systemd/system/SplunkForwarder.service
+      register: splunk_systemd_unit
+
+    - name: Start Splunk forwarder (first time)
       shell: |
         {{ splunk_home }}/bin/splunk start --accept-license --answer-yes --no-prompt
-        {{ splunk_home }}/bin/splunk enable boot-start -systemd-managed 1 || {{ splunk_home }}/bin/splunk enable boot-start
       register: splunk_start_result
+      when: 
+        - splunk_status_check.rc != 0 or 'splunkd is not running' in splunk_status_check.stdout | default('')
+
+    - name: Enable boot-start (only if unit file doesn't exist)
+      shell: |
+        {{ splunk_home }}/bin/splunk enable boot-start -systemd-managed 1 --accept-license --answer-yes --no-prompt || \
+        {{ splunk_home }}/bin/splunk enable boot-start --accept-license --answer-yes --no-prompt
+      when: not splunk_systemd_unit.stat.exists
+      ignore_errors: yes
+
+    - name: Ensure SplunkForwarder service is started via systemd
+      systemd:
+        name: SplunkForwarder
+        state: started
+        enabled: yes
+      ignore_errors: yes
+      when: splunk_systemd_unit.stat.exists
 
     - name: Verify Splunk forwarder is running
       shell: "{{ splunk_home }}/bin/splunk status"
       register: splunk_status
+      changed_when: false
       failed_when: "'splunkd is running' not in splunk_status.stdout"
-      ignore_errors: yes
 
     - name: Clean up temp directory
       file:
@@ -352,15 +379,23 @@
         data: 1
         type: dword
 
-    - name: Start Splunk forwarder service
-      win_shell: |
-        & "{{ splunk_home }}\bin\splunk.exe" start --accept-license --answer-yes --no-prompt
+    - name: Check if SplunkForwarder service exists and is running
+      win_service:
+        name: SplunkForwarder
+      register: splunk_service_check
       ignore_errors: yes
 
-    - name: Set Splunk service to auto-start
+    - name: Start Splunk forwarder service (first time)
+      win_shell: |
+        & "{{ splunk_home }}\bin\splunk.exe" start --accept-license --answer-yes --no-prompt
+      when: splunk_service_check.state is not defined or splunk_service_check.state != 'running'
+      ignore_errors: yes
+
+    - name: Set Splunk service to auto-start and ensure running
       win_service:
         name: SplunkForwarder
         start_mode: auto
+        state: started
       ignore_errors: yes
 
     - name: Clean up installer
