@@ -73,17 +73,19 @@ The `windows-scripts/` folder contains **comprehensive Windows hardening** inclu
 .\AD\Verify_Hardening.ps1
 ```
 
-## Print Spooler Conflict
+## Print Spooler
 
-| Script | Print Spooler | Reason |
-|--------|---------------|--------|
-| AD\RapidDeploy_AllInOne.ps1 | **DISABLES** | Security (PrintNightmare) |
-| windows-scripts\Full-Harden.ps1 | Keeps enabled | May need for printing injects |
+Both AD scripts and windows-scripts **DISABLE** Print Spooler (PrintNightmare CVE-2021-34527).
 
-**If you need printing for injects:**
+If printing is needed for an inject:
 ```powershell
-Set-Service Spooler -StartupType Automatic
+# Re-enable temporarily
+Set-Service Spooler -StartupType Manual
 Start-Service Spooler
+
+# Disable again after
+Stop-Service Spooler -Force
+Set-Service Spooler -StartupType Disabled
 ```
 
 ## Parameters

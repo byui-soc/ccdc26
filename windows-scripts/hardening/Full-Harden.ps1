@@ -648,9 +648,9 @@ function Invoke-QuickHarden {
     
     $startTime = Get-Date
     
-    # CVE patches (PrintNightmare does NOT disable spooler - may need for injects)
+    # CVE patches
     Patch-Mimikatz
-    Patch-PrintNightmare  # Spooler stays enabled, only registry mitigations applied
+    Patch-PrintNightmare -DisableSpooler  # Disable Print Spooler (PrintNightmare CVE-2021-34527)
     Upgrade-SMB
     Install-EternalBluePatch
     

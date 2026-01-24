@@ -436,13 +436,13 @@ These scripts in the `AD/` folder focus on Purple Knight and BloodHound findings
 
 ### Print Spooler Note
 
-- `AD/` scripts **DISABLE** Print Spooler (security)
-- `windows-scripts/` **KEEPS** it enabled (for printing injects)
+Both script sets **DISABLE** Print Spooler (PrintNightmare CVE-2021-34527).
 
-If you need printing, re-enable after running AD scripts:
+If you need printing for an inject, re-enable temporarily:
 ```powershell
-Set-Service Spooler -StartupType Automatic
+Set-Service Spooler -StartupType Manual
 Start-Service Spooler
+# Disable again after inject completes
 ```
 
 ---

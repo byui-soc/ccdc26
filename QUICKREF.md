@@ -175,23 +175,19 @@ cd C:\ccdc26\AD
 | Phase3_Auditing_Hardening.ps1 | 5 min | Audit policy, PS logging, LLMNR/NBT-NS |
 | Verify_Hardening.ps1 | 30 sec | Confirms all settings applied |
 
-### Print Spooler Conflict
+### Print Spooler
 
-The two script sets handle Print Spooler differently:
+Both script sets **DISABLE** Print Spooler (PrintNightmare CVE-2021-34527 mitigation).
 
-| Script | Print Spooler | Reason |
-|--------|---------------|--------|
-| AD\RapidDeploy_AllInOne.ps1 | DISABLES | Security (PrintNightmare) |
-| deploy.ps1 / Full-Harden.ps1 | KEEPS ENABLED | May need for printing injects |
-
-**Resolution:**
-- If NO printing injects expected: Run AD scripts first, leave Spooler disabled
-- If printing needed: Run deploy.ps1 first (keeps enabled), or re-enable after AD scripts
-
+If printing is needed for an inject:
 ```powershell
-# Re-enable Print Spooler if needed for injects
-Set-Service Spooler -StartupType Automatic
+# Re-enable Print Spooler temporarily
+Set-Service Spooler -StartupType Manual
 Start-Service Spooler
+
+# Disable again after inject
+Stop-Service Spooler -Force
+Set-Service Spooler -StartupType Disabled
 ```
 
 ---
