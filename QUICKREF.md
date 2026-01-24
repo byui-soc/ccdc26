@@ -145,6 +145,57 @@ cd C:\ccdc26\windows-scripts
 
 ---
 
+## WINDOWS DOMAIN CONTROLLER HARDENING
+
+Two script sets available for DC hardening. Use both for maximum coverage.
+
+### Recommended Order (Domain Controller)
+
+```powershell
+# 1. Purple Knight / BloodHound fixes (2-3 min)
+cd C:\ccdc26\AD
+.\RapidDeploy_AllInOne.ps1 -Force
+
+# 2. Comprehensive Windows hardening (3-5 min)
+cd C:\ccdc26
+.\deploy.ps1 -Quick
+
+# 3. Verify settings applied
+cd C:\ccdc26\AD
+.\Verify_Hardening.ps1
+```
+
+### AD Scripts (AD\ folder)
+
+| Script | Time | What It Does |
+|--------|------|--------------|
+| RapidDeploy_AllInOne.ps1 | 2-3 min | All Purple Knight fixes in one run |
+| Phase1_Critical_Hardening.ps1 | 2 min | PrintSpooler, MAQ, LDAP signing |
+| Phase2_HighPriority_Hardening.ps1 | 5 min | Password policy, DNS zones, nested EA |
+| Phase3_Auditing_Hardening.ps1 | 5 min | Audit policy, PS logging, LLMNR/NBT-NS |
+| Verify_Hardening.ps1 | 30 sec | Confirms all settings applied |
+
+### Print Spooler Conflict
+
+The two script sets handle Print Spooler differently:
+
+| Script | Print Spooler | Reason |
+|--------|---------------|--------|
+| AD\RapidDeploy_AllInOne.ps1 | DISABLES | Security (PrintNightmare) |
+| deploy.ps1 / Full-Harden.ps1 | KEEPS ENABLED | May need for printing injects |
+
+**Resolution:**
+- If NO printing injects expected: Run AD scripts first, leave Spooler disabled
+- If printing needed: Run deploy.ps1 first (keeps enabled), or re-enable after AD scripts
+
+```powershell
+# Re-enable Print Spooler if needed for injects
+Set-Service Spooler -StartupType Automatic
+Start-Service Spooler
+```
+
+---
+
 ## HOW ANSIBLE WORKS
 
 Ansible runs on ONE machine (controller) and executes commands on OTHER machines via SSH/WinRM.
