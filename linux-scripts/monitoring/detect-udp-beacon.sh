@@ -88,13 +88,17 @@ detect_udp_beacons() {
         
         # Track destination frequency
         local dest_key="${peer_ip}:${peer_port}"
-        ((udp_destinations[$dest_key]++))
+        if [[ -v udp_destinations[$dest_key] ]]; then
+            ((udp_destinations[$dest_key]++))
+        else
+            udp_destinations[$dest_key]=1
+        fi
         
         # Get process details
         local proc_info=$(get_process_info "$local_port")
         connection_details[$dest_key]="$proc_info"
         
-    done < <(ss -ulnp 2>/dev/null)
+    done < <(ss -ulnp 2>/dev/null || true)
     
     # Method 2: Capture UDP packets for pattern analysis
     if command -v tcpdump &>/dev/null; then
@@ -121,7 +125,11 @@ detect_udp_beacons() {
                 [[ "$dest_port" == "67" || "$dest_port" == "68" ]] && continue
                 
                 log_warn "Potential beacon pattern: $count packets to $dest_ip:$dest_port"
-                ((udp_destinations["$dest_ip:$dest_port"]+=$count))
+                if [[ -v udp_destinations["$dest_ip:$dest_port"] ]]; then
+                    ((udp_destinations["$dest_ip:$dest_port"]+=$count))
+                else
+                    udp_destinations["$dest_ip:$dest_port"]=$count
+                fi
             fi
         done < "$capture_file"
         
@@ -149,19 +157,23 @@ detect_udp_beacons() {
     echo ""
     log_info "=== UDP Connection Summary ==="
     
-    for dest in "${!udp_destinations[@]}"; do
-        local count=${udp_destinations[$dest]}
-        local details=${connection_details[$dest]:-"unknown|unknown|unknown|unknown"}
-        
-        IFS='|' read -r pid user exe cmdline <<< "$details"
-        
-        if [[ "$count" -ge "$BEACON_THRESHOLD" ]]; then
-            ((found_beacons++))
-            log_alert "UDP BEACON DETECTED: dest=$dest count=$count pid=$pid user=$user exe=$exe"
-        else
-            log_info "UDP connection: dest=$dest count=$count"
-        fi
-    done
+    if [[ ${#udp_destinations[@]} -eq 0 ]]; then
+        log_info "No outbound UDP connections detected"
+    else
+        for dest in "${!udp_destinations[@]}"; do
+            local count=${udp_destinations[$dest]}
+            local details=${connection_details[$dest]:-"unknown|unknown|unknown|unknown"}
+            
+            IFS='|' read -r pid user exe cmdline <<< "$details"
+            
+            if [[ "$count" -ge "$BEACON_THRESHOLD" ]]; then
+                ((found_beacons++))
+                log_alert "UDP BEACON DETECTED: dest=$dest count=$count pid=$pid user=$user exe=$exe"
+            else
+                log_info "UDP connection: dest=$dest count=$count"
+            fi
+        done
+    fi
     
     echo ""
     if [[ $found_beacons -gt 0 ]]; then
