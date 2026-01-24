@@ -292,6 +292,13 @@ logoff <session_id>                 # Boot them
 # Linux - network shutdown / start up
 sudo ip link set ens18 down
 sudo ip link set ens18 up
+
+
+# Windows - network shutdown / start up
+Get-NetAdapter # Shows the interfaces you have
+Disable-NetAdapter -Name "Ethernet" -Confirm:$false
+Enable-NetAdapter -Name "Ethernet"
+
 ```
 
 ### Block IP
