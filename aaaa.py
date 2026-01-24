@@ -1,18 +1,19 @@
 import paramiko
-
-FIREWALL_IP = '172.20.242.254'
-USERNAME = 'admin'
-PASSWORD = 'Bubbapaloalto632@'
+import time
 
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect(FIREWALL_IP, username=USERNAME, password=PASSWORD, look_for_keys=False)
+client.connect('172.20.242.254', username='admin', password='Bubbapaloalto632@', look_for_keys=False)
 
-# Disable pagination first, then get policy
-commands = "set cli pager off\nshow running security-policy\n"
+shell = client.invoke_shell()
+time.sleep(2)
 
-stdin, stdout, stderr = client.exec_command(commands, timeout=30)
-output = stdout.read().decode()
+shell.send('set cli pager off\n')
+time.sleep(1)
+shell.send('show running security-policy\n')
+time.sleep(5)
+
+output = shell.recv(65535).decode()
 
 with open('palo_security_policy.txt', 'w') as f:
     f.write(output)
