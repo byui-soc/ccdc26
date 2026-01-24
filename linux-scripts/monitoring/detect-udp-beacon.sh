@@ -59,8 +59,9 @@ detect_udp_beacons() {
     log_info "Sampling UDP traffic for ${SAMPLE_DURATION} seconds..."
     
     local found_beacons=0
-    declare -A udp_destinations
-    declare -A connection_details
+    declare -A udp_destinations=()
+    declare -A connection_details=()
+    declare -A samples=()
     
     # Method 1: Check current UDP connections
     log_info "Checking established UDP connections..."
