@@ -30,7 +30,7 @@ source "$SCRIPT_DIR/users.sh"
 # Run user hardening WITHOUT password changes
 audit_users
 harden_sudo
-set_password_policy
+# set_password_policy # Run without setting policiies - during competitions this can break scoring engine users. Update their password after submitting a password reset inject.
 
 # Note: disable_unauthorized_users is interactive, skip in quick mode
 # Users can run it manually from Advanced Options if needed
