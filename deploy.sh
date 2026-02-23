@@ -1,22 +1,23 @@
 #!/bin/bash
-#=============================================================================
-# CCDC26 All-in-One Deployment Script
-#=============================================================================
-# Master entry point for the CCDC26 toolkit
-# Detects environment and provides appropriate options
-#
+# CCDC26 Defense Toolkit -- Linux Entry Point
 # Usage:
-#   ./deploy.sh              # Interactive menu
-#   ./deploy.sh --quick      # Quick local harden
-#   ./deploy.sh --ansible    # Ansible deployment menu
-#=============================================================================
-
-set -e
+#   sudo ./deploy.sh              # Interactive: configure + launch Monarch
+#   sudo ./deploy.sh --quick      # Non-interactive: run 01-harden.sh locally
+#   sudo ./deploy.sh --monarch    # Jump straight to Monarch REPL
+#   sudo ./deploy.sh --configure  # Edit config.env only
+#   sudo ./deploy.sh --serve      # HTTP server for Windows deployment
+#   sudo ./deploy.sh --help       # Show help
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Source environment config
+if [ -f "$SCRIPT_DIR/config.env" ]; then
+    # shellcheck disable=SC1091
+    source "$SCRIPT_DIR/config.env"
+fi
+
 #=============================================================================
-# COLORS
+# COLORS AND OUTPUT
 #=============================================================================
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -34,45 +35,6 @@ error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 header()  { echo -e "\n${BOLD}${PURPLE}=== $1 ===${NC}\n"; }
 
 #=============================================================================
-# ENVIRONMENT DETECTION
-#=============================================================================
-detect_environment() {
-    # Check if we're on the target system or an Ansible controller
-    IS_ANSIBLE_CONTROLLER=false
-    IS_TARGET_SYSTEM=true
-    
-    # Check for Ansible (may be in user's ~/.local/bin from pip install)
-    if command -v ansible &>/dev/null; then
-        IS_ANSIBLE_CONTROLLER=true
-    elif [ -f "$HOME/.local/bin/ansible" ]; then
-        IS_ANSIBLE_CONTROLLER=true
-        export PATH="$HOME/.local/bin:$PATH"
-    elif [ -f "/home/$SUDO_USER/.local/bin/ansible" ] 2>/dev/null; then
-        # Running as sudo, check the original user's pip install location
-        IS_ANSIBLE_CONTROLLER=true
-        export PATH="/home/$SUDO_USER/.local/bin:$PATH"
-    elif python3 -c "import ansible" &>/dev/null; then
-        IS_ANSIBLE_CONTROLLER=true
-    fi
-    
-    # Detect OS
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        OS_NAME="$NAME"
-        OS_ID="$ID"
-    else
-        OS_NAME="Unknown"
-        OS_ID="unknown"
-    fi
-    
-    # Check if root
-    IS_ROOT=false
-    if [ "$EUID" -eq 0 ]; then
-        IS_ROOT=true
-    fi
-}
-
-#=============================================================================
 # BANNER
 #=============================================================================
 show_banner() {
@@ -84,466 +46,285 @@ show_banner() {
     echo " ╚██████╗╚██████╗██████╔╝╚██████╗███████╗╚██████╔╝"
     echo "  ╚═════╝ ╚═════╝╚═════╝  ╚═════╝╚══════╝ ╚═════╝ "
     echo -e "${NC}"
-    echo -e "${BOLD}CCDC26 Defense Toolkit${NC}"
-    echo ""
-    echo -e "OS: ${GREEN}$OS_NAME${NC}"
-    echo -e "Ansible: ${GREEN}$([ "$IS_ANSIBLE_CONTROLLER" = true ] && echo "Available" || echo "Not installed")${NC}"
-    echo -e "Root: ${GREEN}$([ "$IS_ROOT" = true ] && echo "Yes" || echo "No")${NC}"
+    echo -e "${BOLD}CCDC26 Defense Toolkit${NC}  —  Monarch Workflow"
     echo ""
 }
 
 #=============================================================================
-# QUICK HARDEN (non-interactive)
+# ROOT CHECK
 #=============================================================================
-quick_harden() {
-    if [ "$IS_ROOT" != true ]; then
+require_root() {
+    if [ "$EUID" -ne 0 ]; then
         error "Must be root. Run: sudo $0"
         exit 1
     fi
-    
-    header "Quick Harden - Starting"
-    info "This will harden the system with safe defaults."
-    info "Passwords are NOT changed - use Ansible for that."
-    echo ""
-    
-    cd "$SCRIPT_DIR/linux-scripts"
-    bash ./hardening/full-harden.sh
-    
-    success "Quick Harden complete!"
 }
 
 #=============================================================================
-# ADVANCED MENU (for power users)
+# INSTALL DEPENDENCIES
 #=============================================================================
-advanced_menu() {
-    header "Advanced Options"
-    
-    echo -e "${YELLOW}All options affect THIS machine only.${NC}"
-    echo ""
-    echo "Hardening:"
-    echo "  1) Interactive Harden     - Choose individual scripts (users, ssh, firewall, etc.)"
-    echo "  2) Service Hardening      - Harden specific services (web, mail, DNS)"
-    echo ""
-    echo "SIEM/Monitoring:"
-    echo "  3) Deploy Splunk Forwarder- Install Splunk forwarder on THIS machine"
-    echo "  4) Start Monitoring       - Real-time file/process/network monitoring"
-    echo ""
-    echo "Security:"
-    echo "  5) Hunt for Persistence   - Scan for backdoors, cron jobs, startup scripts"
-    echo "  6) Incident Response      - Evidence collection, session killing, isolation"
-    echo "  7) User Enumeration       - List users, permissions, sudo access, SSH keys"
-    echo ""
-    echo "0) Back to main menu"
-    echo ""
-    
-    read -p "Select option: " choice
-    
-    case $choice in
-        1)
-            if [ "$IS_ROOT" != true ]; then
-                error "Must be root. Run: sudo $0"
-                return
-            fi
-            header "Interactive Hardening"
-            cd "$SCRIPT_DIR/linux-scripts/hardening"
-            echo "Available hardening scripts:"
-            echo "  1) users.sh     - User account hardening"
-            echo "  2) ssh.sh       - SSH hardening"
-            echo "  3) firewall.sh  - Firewall setup"
-            echo "  4) services.sh  - Service management"
-            echo "  5) permissions.sh - File permissions"
-            echo "  6) kernel.sh    - Kernel hardening"
-            echo ""
-            read -p "Select script [1-6]: " script_choice
-            case $script_choice in
-                1) bash ./users.sh ;;
-                2) bash ./ssh.sh ;;
-                3) bash ./firewall.sh ;;
-                4) bash ./services.sh ;;
-                5) bash ./permissions.sh ;;
-                6) bash ./kernel.sh ;;
-                *) error "Invalid option" ;;
-            esac
-            ;;
-        2)
-            if [ "$IS_ROOT" != true ]; then
-                error "Must be root. Run: sudo $0"
-                return
-            fi
-            header "Running Service Hardening"
-            cd "$SCRIPT_DIR/linux-scripts/services"
-            bash ./harden-all.sh
-            ;;
-        3)
-            if [ "$IS_ROOT" != true ]; then
-                error "Must be root. Run: sudo $0"
-                return
-            fi
-            header "Deploying Splunk Forwarder"
-            info "Forwarding to competition Splunk server: 172.20.242.20:9997"
-            cd "$SCRIPT_DIR/linux-scripts/tools"
-            bash ./splunk-forwarder.sh
-            ;;
-        4)
-            if [ "$IS_ROOT" != true ]; then
-                error "Must be root. Run: sudo $0"
-                return
-            fi
-            header "Starting Monitoring"
-            cd "$SCRIPT_DIR/linux-scripts/monitoring"
-            bash ./deploy-monitoring.sh
-            ;;
-        5)
-            if [ "$IS_ROOT" != true ]; then
-                error "Must be root. Run: sudo $0"
-                return
-            fi
-            header "Hunting for Persistence"
-            cd "$SCRIPT_DIR/linux-scripts/persistence-hunting"
-            bash ./full-hunt.sh
-            ;;
-        6)
-            if [ "$IS_ROOT" != true ]; then
-                error "Must be root. Run: sudo $0"
-                return
-            fi
-            header "Incident Response Tools"
-            cd "$SCRIPT_DIR/linux-scripts/incident-response"
-            echo "Available IR scripts:"
-            ls -1 *.sh
-            echo ""
-            read -p "Enter script name (or 'back'): " ir_script
-            if [ "$ir_script" != "back" ] && [ -f "$ir_script" ]; then
-                bash "./$ir_script"
-            fi
-            ;;
-        7)
-            if [ "$IS_ROOT" != true ]; then
-                error "Must be root. Run: sudo $0"
-                return
-            fi
-            header "User Enumeration"
-            cd "$SCRIPT_DIR/linux-scripts/persistence-hunting"
-            bash ./user-audit.sh
-            ;;
-        0)
-            return
-            ;;
-        *)
-            error "Invalid option"
-            ;;
-    esac
-}
+install_deps() {
+    header "Installing Dependencies"
 
-#=============================================================================
-# ANSIBLE MENU
-#=============================================================================
+    local pkgs=(git python3 python3-pip sshpass)
 
-# Global ansible settings
-ANSIBLE_AUTH_MODE="prompt"  # "prompt" = ask for passwords, "inventory" = use inventory file
-ANSIBLE_EXTRA_ARGS=""
-
-setup_ansible_auth() {
-    header "Ansible Authentication Setup"
-    echo "How do you want to authenticate to remote hosts?"
-    echo ""
-    echo "  1) Prompt for passwords (RECOMMENDED - more secure)"
-    echo "     Will ask for SSH password and sudo password at runtime"
-    echo ""
-    echo "  2) Use inventory file credentials (faster, less secure)"
-    echo "     Uses ansible_password and ansible_become_pass from inventory.ini"
-    echo ""
-    read -p "Select [1-2] (default: 1): " auth_choice
-    
-    case $auth_choice in
-        2)
-            ANSIBLE_AUTH_MODE="inventory"
-            ANSIBLE_EXTRA_ARGS=""
-            info "Using inventory file credentials"
-            ;;
-        *)
-            ANSIBLE_AUTH_MODE="prompt"
-            ANSIBLE_EXTRA_ARGS="--ask-pass --ask-become-pass"
-            info "Will prompt for SSH and sudo passwords"
-            ;;
-    esac
-    
-    # Always disable host key checking for CCDC speed
-    export ANSIBLE_HOST_KEY_CHECKING=False
-    success "Host key checking disabled"
-    echo ""
-}
-
-ansible_menu() {
-    if [ "$IS_ANSIBLE_CONTROLLER" != true ]; then
-        error "Ansible is not installed"
-        echo "Install with: pip3 install ansible pywinrm"
-        return
+    if command -v apt-get &>/dev/null; then
+        apt-get update -qq
+        apt-get install -y -qq "${pkgs[@]}" 2>/dev/null
+    elif command -v dnf &>/dev/null; then
+        dnf install -y -q "${pkgs[@]}" 2>/dev/null
+    elif command -v yum &>/dev/null; then
+        yum install -y -q "${pkgs[@]}" 2>/dev/null
+    else
+        warn "Unknown package manager — install manually: ${pkgs[*]}"
     fi
-    
-    # Check for optional but recommended dependencies
-    local missing_deps=()
-    if ! command -v sshpass &>/dev/null; then
-        missing_deps+=("sshpass (required for password-based SSH)")
+
+    pip3 install -q paramiko python-dotenv 2>/dev/null
+    success "Dependencies installed"
+}
+
+#=============================================================================
+# GENERATE config.ps1 FROM config.env
+#=============================================================================
+generate_ps_config() {
+    local src="$SCRIPT_DIR/config.env"
+    local dst="$SCRIPT_DIR/config.ps1"
+
+    if [ ! -f "$src" ]; then
+        error "config.env not found"
+        return 1
     fi
-    
-    if [ ${#missing_deps[@]} -gt 0 ]; then
-        warn "Optional dependencies missing:"
-        for dep in "${missing_deps[@]}"; do
-            echo "  - $dep"
-        done
-        echo ""
-        if [ "$OS_ID" = "ubuntu" ] || [ "$OS_ID" = "debian" ]; then
-            echo "Install with: sudo apt install -y sshpass"
-        elif [ "$OS_ID" = "fedora" ] || [ "$OS_ID" = "rhel" ]; then
-            echo "Install with: sudo dnf install -y sshpass"
+
+    info "Generating config.ps1 from config.env ..."
+
+    # Build the hashtable entries by reading exports from config.env
+    local entries=""
+    while IFS= read -r line; do
+        # Match lines like: export VAR_NAME="value"  or  export VAR_NAME=value
+        if [[ "$line" =~ ^export[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)=[\""]?([^\"]*)[\""]?$ ]]; then
+            local bash_name="${BASH_REMATCH[1]}"
+            local value="${BASH_REMATCH[2]}"
+
+            # Convert UPPER_SNAKE_CASE to PascalCase
+            local pascal=""
+            IFS='_' read -ra parts <<< "$bash_name"
+            for part in "${parts[@]}"; do
+                pascal+="$(echo "${part:0:1}" | tr '[:lower:]' '[:upper:]')$(echo "${part:1}" | tr '[:upper:]' '[:lower:]')"
+            done
+
+            # Pad key for alignment
+            local padded
+            padded=$(printf "%-20s" "$pascal")
+            entries+="    ${padded}= \"${value}\"\n"
         fi
-        echo ""
-        info "Continuing anyway (you may need these for some features)..."
-        echo ""
-    fi
-    
-    # Setup auth on first run
-    if [ -z "$ANSIBLE_AUTH_CONFIGURED" ]; then
-        setup_ansible_auth
-        ANSIBLE_AUTH_CONFIGURED=true
-    fi
-    
-    header "Ansible Control Panel"
-    
-    echo -e "${YELLOW}These commands run on OTHER machines listed in ansible/inventory.ini${NC}"
-    echo -e "${YELLOW}This machine is the controller - it sends commands via SSH/WinRM.${NC}"
-    echo -e "Auth mode: ${GREEN}$ANSIBLE_AUTH_MODE${NC} | Extra args: ${GREEN}${ANSIBLE_EXTRA_ARGS:-none}${NC}"
-    echo ""
-    echo "1) Generate inventory from CSV     - Convert CSV to inventory.ini"
-    echo "2) Test connectivity               - Verify Ansible can reach all machines (run first!)"
-    echo "3) Password Reset + Kick Sessions  - Change ALL passwords, create ccdcuser1/2, boot attackers"
-    echo "4) Deploy Hardening Scripts        - Copy toolkit to all machines (option to run)"
-    echo "5) Deploy Splunk Forwarders        - Install Splunk forwarder on all machines"
-    echo "6) Gather Facts                    - Collect system info from all machines"
-    echo "7) Run custom playbook"
-    echo "8) Change auth mode                - Switch between prompt/inventory auth"
-    echo ""
-    echo "0) Back to main menu"
-    echo ""
-    
-    read -p "Select option: " choice
-    
-    ANSIBLE_DIR="$SCRIPT_DIR/ansible"
-    
-    case $choice in
-        1)
-            header "Generate Inventory from CSV"
-            read -p "Enter path to CSV file: " csv_file
-            if [ -f "$csv_file" ]; then
-                python3 "$ANSIBLE_DIR/setup/csv2inv.py" "$csv_file" "$ANSIBLE_DIR/inventory.ini"
-                success "Inventory generated: $ANSIBLE_DIR/inventory.ini"
-            else
-                error "File not found: $csv_file"
-            fi
-            ;;
-        2)
-            header "Testing Connectivity"
-            
-            # Check for sshpass if using prompt auth mode
-            if [ "$ANSIBLE_AUTH_MODE" = "prompt" ]; then
-                if ! command -v sshpass &>/dev/null; then
-                    error "sshpass is required for password-based authentication"
-                    echo ""
-                    echo "Install with:"
-                    if [ "$OS_ID" = "ubuntu" ] || [ "$OS_ID" = "debian" ]; then
-                        echo "  sudo apt install -y sshpass"
-                    elif [ "$OS_ID" = "fedora" ] || [ "$OS_ID" = "rhel" ]; then
-                        echo "  sudo dnf install -y sshpass"
-                    else
-                        echo "  sudo apt install -y sshpass  # Debian/Ubuntu"
-                        echo "  sudo dnf install -y sshpass  # Fedora/RHEL"
-                    fi
-                    echo ""
-                    read -p "Press Enter to continue..."
-                    return
-                fi
-            fi
-            
-            info "Testing connectivity to all hosts..."
-            info "Using auth mode: $ANSIBLE_AUTH_MODE"
-            echo ""
-            
-            # Run connectivity test
-            if ansible all -i "$ANSIBLE_DIR/inventory.ini" -m ping $ANSIBLE_EXTRA_ARGS; then
-                echo ""
-                success "All hosts reachable!"
-            else
-                echo ""
-                warn "Some hosts failed. Check inventory.ini passwords and SSH connectivity."
-                echo ""
-                echo "Common issues:"
-                echo "  - Wrong password in inventory.ini"
-                echo "  - SSH not enabled on target"
-                echo "  - Firewall blocking SSH/WinRM"
-                echo "  - Network routing issues"
-            fi
-            
-            echo ""
-            read -p "Press Enter to continue..."
-            ;;
-        3)
-            header "Password Reset and User Creation"
-            warn "This will reset ALL user passwords and create competition users!"
-            read -p "Continue? (y/n): " confirm
-            if [ "$confirm" = "y" ]; then
-                ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/changepw_kick.yml" $ANSIBLE_EXTRA_ARGS
-            fi
-            ;;
-        4)
-            header "Deploy Hardening Scripts"
-            echo "Options:"
-            echo "  1) Deploy only (no execution)"
-            echo "  2) Deploy and run full hardening"
-            echo ""
-            read -p "Select [1-2]: " deploy_opt
-            
-            case $deploy_opt in
-                1)
-                    ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/deploy_hardening.yml" $ANSIBLE_EXTRA_ARGS
-                    ;;
-                2)
-                    ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/deploy_hardening.yml" -e "run_full=true" $ANSIBLE_EXTRA_ARGS
-                    ;;
-            esac
-            ;;
-        5)
-            header "Deploy Splunk Forwarders"
-            info "Forwarding to competition Splunk server: 172.20.242.20:9997"
-            ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/deploy_splunk_forwarders.yml" $ANSIBLE_EXTRA_ARGS
-            ;;
-        6)
-            header "Gathering Facts"
-            ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$ANSIBLE_DIR/gather_facts.yml" $ANSIBLE_EXTRA_ARGS
-            success "Facts saved to: $ANSIBLE_DIR/collected_facts/"
-            ;;
-        7)
-            header "Run Custom Playbook"
-            read -p "Enter playbook path: " playbook
-            if [ -f "$playbook" ]; then
-                ansible-playbook -i "$ANSIBLE_DIR/inventory.ini" "$playbook" $ANSIBLE_EXTRA_ARGS
-            else
-                error "Playbook not found: $playbook"
-            fi
-            ;;
-        8)
-            ANSIBLE_AUTH_CONFIGURED=""
-            setup_ansible_auth
-            ANSIBLE_AUTH_CONFIGURED=true
-            ;;
-        0)
-            return
-            ;;
-        *)
-            error "Invalid option"
-            ;;
-    esac
+    done < "$src"
+
+    cat > "$dst" << 'HEADER'
+# CCDC Environment Configuration - PowerShell
+# =============================================
+# AUTO-GENERATED from config.env — re-run ./deploy.sh --configure to refresh.
+# Do not edit by hand; edit config.env instead.
+
+# BEGIN CONFIG
+$script:EnvConfig = @{
+HEADER
+
+    echo -e "$entries" >> "$dst"
+
+    cat >> "$dst" << 'FOOTER'
+}
+
+$script:EnvConfigured = $true
+# END CONFIG
+
+function Get-EnvConfig {
+    return $script:EnvConfig
+}
+
+function Test-EnvConfigured {
+    if (-not $script:EnvConfigured) {
+        Write-Host ""
+        Write-Host "[!!] Environment is NOT configured." -ForegroundColor Red
+        Write-Host "     Run deploy.sh --configure on the Linux box to regenerate." -ForegroundColor Red
+        Write-Host ""
+        return $false
+    }
+    return $true
+}
+FOOTER
+
+    success "config.ps1 generated"
 }
 
 #=============================================================================
-# MAIN MENU (Simple 3-option menu)
+# CONFIGURE
+#=============================================================================
+configure() {
+    header "Configure Environment"
+
+    local editor="${EDITOR:-vi}"
+    info "Opening config.env in $editor ..."
+    "$editor" "$SCRIPT_DIR/config.env"
+
+    # Re-source after editing
+    source "$SCRIPT_DIR/config.env"
+
+    if [ "$CONFIGURED" = "true" ]; then
+        success "config.env loaded (CONFIGURED=true)"
+        generate_ps_config
+    else
+        warn "CONFIGURED is not true — set CONFIGURED=\"true\" in config.env when ready."
+    fi
+}
+
+#=============================================================================
+# QUICK HARDEN (this machine only)
+#=============================================================================
+quick_harden() {
+    require_root
+    header "Quick Harden — This Machine Only"
+
+    if [ -f "$SCRIPT_DIR/monarch/scripts/01-harden.sh" ]; then
+        info "Running 01-harden.sh ..."
+        bash "$SCRIPT_DIR/monarch/scripts/01-harden.sh"
+    else
+        error "monarch/scripts/01-harden.sh not found — cannot harden"
+        return 1
+    fi
+
+    if [ -f "$SCRIPT_DIR/monarch/scripts/02-firewall.sh" ]; then
+        info "Running 02-firewall.sh ..."
+        bash "$SCRIPT_DIR/monarch/scripts/02-firewall.sh"
+    else
+        error "monarch/scripts/02-firewall.sh not found — cannot apply firewall"
+        return 1
+    fi
+
+    success "Quick harden complete"
+}
+
+#=============================================================================
+# LAUNCH MONARCH
+#=============================================================================
+launch_monarch() {
+    require_root
+
+    if [ ! -d "$SCRIPT_DIR/monarch" ]; then
+        error "monarch/ directory not found"
+        exit 1
+    fi
+
+    if [ ! -f "$SCRIPT_DIR/monarch/run.sh" ]; then
+        error "monarch/run.sh not found"
+        exit 1
+    fi
+
+    install_deps
+
+    header "Launching Monarch"
+    cd "$SCRIPT_DIR/monarch" || exit 1
+    exec ./run.sh
+}
+
+#=============================================================================
+# SERVE TOOLKIT (HTTP server for Windows deployment)
+#=============================================================================
+serve_toolkit() {
+    header "Serving Toolkit via HTTP"
+
+    local port=8080
+    local ip
+    ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    ip="${ip:-<THIS_IP>}"
+
+    echo ""
+    info "Starting HTTP server on port $port ..."
+    echo ""
+    echo -e "  ${BOLD}Windows machines can download the toolkit from:${NC}"
+    echo -e "    ${GREEN}http://${ip}:${port}/deploy.ps1${NC}"
+    echo -e "    ${GREEN}http://${ip}:${port}/config.ps1${NC}"
+    echo ""
+    echo -e "  ${YELLOW}On Windows (PowerShell as Admin):${NC}"
+    echo -e "    iwr http://${ip}:${port}/deploy.ps1 -OutFile C:\\deploy.ps1"
+    echo -e "    iwr http://${ip}:${port}/config.ps1 -OutFile C:\\config.ps1"
+    echo ""
+    echo -e "  Press ${BOLD}Ctrl+C${NC} to stop."
+    echo ""
+
+    cd "$SCRIPT_DIR" || exit 1
+    python3 -m http.server "$port"
+}
+
+#=============================================================================
+# HELP
+#=============================================================================
+show_help() {
+    show_banner
+    echo "Usage: sudo $0 [option]"
+    echo ""
+    echo "OPTIONS:"
+    echo "  (none)        Interactive menu"
+    echo "  --quick       Harden THIS machine (01-harden + 02-firewall)"
+    echo "  --monarch     Jump straight to Monarch REPL"
+    echo "  --configure   Edit config.env, regenerate config.ps1"
+    echo "  --serve       HTTP server so Windows can pull deploy.ps1"
+    echo "  --help        Show this help"
+    echo ""
+    echo "TYPICAL WORKFLOW:"
+    echo "  1. sudo ./deploy.sh --configure    # fill in IPs"
+    echo "  2. sudo ./deploy.sh --quick        # harden this box"
+    echo "  3. sudo ./deploy.sh --monarch      # manage all Linux"
+    echo "  4. sudo ./deploy.sh --serve        # let Windows pull scripts"
+    echo ""
+}
+
+#=============================================================================
+# MAIN MENU
 #=============================================================================
 main_menu() {
+    if [ "$CONFIGURED" != "true" ]; then
+        warn "config.env is not configured yet."
+        read -rp "Open config.env in editor now? (Y/n): " yn
+        if [ "$yn" != "n" ] && [ "$yn" != "N" ]; then
+            configure
+        fi
+    fi
+
     while true; do
         show_banner
-        
-        echo -e "${YELLOW}Options 1 & 3 affect THIS machine. Option 2 affects OTHER machines.${NC}"
+
+        echo -e "  ${BOLD}1)${NC} Quick Harden          (this machine only)"
+        echo -e "  ${BOLD}2)${NC} Launch Monarch         (manage all Linux machines)"
+        echo -e "  ${BOLD}3)${NC} Serve toolkit          (HTTP server for Windows)"
+        echo -e "  ${BOLD}4)${NC} Configure environment  (edit config.env)"
+        echo -e "  ${BOLD}q)${NC} Quit"
         echo ""
-        echo "1) Quick Harden (this machine) - SSH, firewall, services, kernel. No passwords."
-        if [ "$IS_ANSIBLE_CONTROLLER" = true ]; then
-            echo "2) Ansible Control Panel     - Manage all machines remotely"
-        else
-            echo "2) Ansible Control Panel     - (not available - pip3 install ansible pywinrm)"
-        fi
-        echo "3) Advanced Options          - Individual tools, SIEM agents, IR"
-        echo ""
-        echo "q) Quit"
-        echo ""
-        
-        read -p "Select option: " choice
-        
+        read -rp "Select option: " choice
+
         case $choice in
-            1)
-                quick_harden
-                ;;
-            2)
-                ansible_menu
-                ;;
-            3)
-                advanced_menu
-                ;;
-            q|Q)
-                echo "Goodbye!"
-                exit 0
-                ;;
-            *)
-                error "Invalid option"
-                ;;
+            1) quick_harden ;;
+            2) launch_monarch ;;
+            3) serve_toolkit ;;
+            4) configure ;;
+            q|Q) echo "Goodbye!"; exit 0 ;;
+            *) error "Invalid option" ;;
         esac
-        
+
         echo ""
-        read -p "Press Enter to continue..."
+        read -rp "Press Enter to continue..."
         clear
     done
 }
 
 #=============================================================================
-# COMMAND LINE OPTIONS
+# CLI DISPATCH
 #=============================================================================
 case "${1:-}" in
-    --quick|-q)
-        detect_environment
-        quick_harden
-        exit 0
-        ;;
-    --ansible|-a)
-        detect_environment
-        ansible_menu
-        exit 0
-        ;;
-    --help|-h)
-        echo "CCDC26 Toolkit"
-        echo ""
-        echo "Usage: sudo $0 [option]"
-        echo ""
-        echo "OPTIONS:"
-        echo "  (none)      Interactive menu"
-        echo "  --quick     Quick harden THIS machine (no passwords changed)"
-        echo "  --ansible   Jump to Ansible menu (manage OTHER machines)"
-        echo "  --help      Show this help"
-        echo ""
-        echo "MAIN MENU OPTIONS:"
-        echo "  1) Quick Harden    - Hardens THIS machine only"
-        echo "                       Does: SSH, firewall, services, permissions, kernel"
-        echo "                       Does NOT: Change passwords"
-        echo "                       Time: ~2 minutes"
-        echo ""
-        echo "  2) Ansible Panel   - Manage OTHER machines via SSH/WinRM"
-        echo "                       Requires: pip3 install ansible pywinrm"
-        echo "                       Key options:"
-        echo "                         3) Password Reset - Changes ALL passwords everywhere"
-        echo "                         4) Deploy Hardening - Copies+runs scripts on all machines"
-        echo ""
-        echo "  3) Advanced        - Individual tools for THIS machine"
-        echo "                       SIEM agents, persistence hunting, IR tools"
-        echo ""
-        echo "TYPICAL WORKFLOW:"
-        echo "  1. sudo ./deploy.sh → 2 → 2  (Test Ansible connectivity)"
-        echo "  2. sudo ./deploy.sh → 2 → 3  (Change all passwords)"
-        echo "  3. sudo ./deploy.sh → 1      (Harden this machine)"
-        echo "  4. sudo ./deploy.sh → 2 → 4  (Harden all other machines)"
-        echo ""
-        echo "See QUICKREF.md for full documentation."
-        exit 0
-        ;;
+    --quick|-q)     require_root; quick_harden ;;
+    --monarch|-m)   require_root; launch_monarch ;;
+    --configure|-c) configure ;;
+    --serve|-s)     serve_toolkit ;;
+    --help|-h)      show_help; exit 0 ;;
+    "")             require_root; main_menu ;;
+    *)              error "Unknown option: $1"; show_help; exit 1 ;;
 esac
-
-# Default: interactive menu
-detect_environment
-clear
-main_menu
