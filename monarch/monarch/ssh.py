@@ -140,6 +140,11 @@ def test_pubkey_works(host):
             pass
 
 
+def _shell_quote(s):
+    """Shell-escape a string for safe passing as an argument"""
+    return "'" + s.replace("'", "'\\''") + "'"
+
+
 def execute(host, script_path, arguments=[]):
     """Executes a script on the specified host"""
     ssh = get_ssh_client(host)
@@ -150,8 +155,9 @@ def execute(host, script_path, arguments=[]):
             filename = Path(script_path).name
             sftp.put(script_path, filename)
             sftp.chmod(filename, 0o700)
+            quoted_args = " ".join(_shell_quote(a) for a in arguments) if arguments else ""
             _, stdout, stderr = ssh.exec_command(
-                "./" + filename + " " + " ".join(arguments), timeout=LONG_TIMEOUT
+                "./" + filename + " " + quoted_args, timeout=LONG_TIMEOUT
             )
             return RunResult(host, stdout, stderr)
     except Exception as e:

@@ -1,4 +1,5 @@
 > **For the competition-day workflow, see [START-HERE.md](START-HERE.md).**
+> **For detailed tool guides, see [MONARCH-GUIDE.md](MONARCH-GUIDE.md) and [DOVETAIL-GUIDE.md](DOVETAIL-GUIDE.md).**
 > This file is reference only -- commands, scripts, and tables.
 
 **Team ___** | **Date:** _______________

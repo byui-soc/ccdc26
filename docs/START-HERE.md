@@ -92,14 +92,66 @@ cd C:\ccdc26\dovetail
 
 ## Firewalls (Minutes 20-30)
 
-### Palo Alto (Linux zone)
-- [ ] Browse to `https://<palo-alto-ip>` → Login → Allow scored service ports + ICMP → Change password
+> **CRITICAL**: Linux and Windows are on SEPARATE subnets with firewalls between them.
+> By default, Linux CANNOT reach Windows. You must open cross-zone rules or
+> Splunk forwarders, toolkit transfers, and management won't work between zones.
 
-### Cisco FTD (Windows zone)
-- [ ] Browse to `https://<cisco-ftd-ip>` → Login → Allow scored service ports + ICMP → Change password
+### Cisco FTD (Windows zone) -- access from Windows workstation
 
-### Router
-- [ ] Login → Change password → Review ACLs
+Browse to `https://<cisco-ftd-ip>`, login with packet credentials.
+
+**Required rules (add these):**
+
+| Rule | Source | Destination | Ports | Why |
+|------|--------|-------------|-------|-----|
+| Scoring inbound | Any | Windows subnet | 53, 80, 443, 21 | Scored services |
+| ICMP | Any | Windows subnet | ICMP | Required by rules |
+| Linux -> Windows | Linux subnet | Windows subnet | 5985, 9997 | WinRM + Splunk |
+| Windows -> Linux | Windows subnet | Linux subnet | 22, 9997, 8000 | SSH + Splunk |
+
+Change default password.
+
+### Palo Alto (Linux zone) -- access from Linux workstation
+
+Browse to `https://<palo-alto-ip>`, login with packet credentials.
+
+**Required rules (add these):**
+
+| Rule | Source | Destination | Ports | Why |
+|------|--------|-------------|-------|-----|
+| Scoring inbound | Any | Linux subnet | 25, 80, 110, 443 | Scored services |
+| ICMP | Any | Linux subnet | ICMP | Required by rules |
+| Windows -> Linux | Windows subnet | Linux subnet | 22, 9997 | SSH + Splunk |
+| Linux -> Windows | Linux subnet | Windows subnet | 5985, 9997 | WinRM + Splunk |
+
+Change default password.
+
+### Router (VyOS)
+
+- [ ] Login with packet credentials → Change password
+- [ ] Verify NAT/routing between zones is working
+- [ ] Do NOT add restrictive ACLs until scored services are confirmed green
+
+### Windows Firewall (on each Windows machine)
+
+After network firewalls are configured, allow Linux subnet through Windows Firewall:
+
+```powershell
+New-NetFirewallRule -DisplayName "Allow Linux Subnet" -Direction Inbound -RemoteAddress LINUX_SUBNET/24 -Action Allow
+```
+
+### Verify cross-zone connectivity
+
+```bash
+# From Linux controller:
+ping <windows-ad-ip>                    # Should work after firewall rules
+nc -zv <windows-ad-ip> 5985            # WinRM port
+```
+
+```powershell
+# From Windows:
+Test-NetConnection -ComputerName <linux-splunk-ip> -Port 9997    # Splunk
+```
 
 ---
 

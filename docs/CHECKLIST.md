@@ -105,25 +105,49 @@ cd C:\ccdc26\dovetail
 
 ## Phase 5: Firewall Configuration (Minutes 25-35)
 
-### Palo Alto (Linux zone)
+> **CRITICAL from prelims**: Linux and Windows were on SEPARATE subnets.
+> If this is the case again, by default Linux CANNOT reach Windows. You MUST add cross-zone rules
+> or Splunk, toolkit transfers, and all cross-zone management will fail.
 
-- [ ] Browse to `https://<palo-alto-ip>` from Linux workstation
-- [ ] Login with credentials from packet
-- [ ] Allow inbound: scored service ports + ICMP
+### Cisco FTD (Windows zone) -- Network Lead from Windows workstation
+
+- [ ] Browse to `https://<cisco-ftd-ip>`, login with packet credentials
+- [ ] Add rule: Scoring (Any -> Windows subnet, ports 53/80/443/21, ICMP)
+- [ ] Add rule: Linux -> Windows (Linux subnet -> Windows subnet, ports 5985/9997)
+- [ ] Add rule: Windows -> Linux (Windows subnet -> Linux subnet, ports 22/9997/8000)
 - [ ] Change default password
+- [ ] Commit/deploy changes
 
-### Cisco FTD (Windows zone)
+### Palo Alto (Linux zone) -- Network Lead from Linux workstation
 
-- [ ] Browse to `https://<cisco-ftd-ip>` from Windows workstation
-- [ ] Login with credentials from packet
-- [ ] Allow inbound: scored service ports + ICMP
+- [ ] Browse to `https://<palo-alto-ip>`, login with packet credentials
+- [ ] Add rule: Scoring (Any -> Linux subnet, ports 25/80/110/443, ICMP)
+- [ ] Add rule: Windows -> Linux (Windows subnet -> Linux subnet, ports 22/9997)
+- [ ] Add rule: Linux -> Windows (Linux subnet -> Windows subnet, ports 5985/9997)
 - [ ] Change default password
+- [ ] Commit changes
 
-### Router
+### Router (VyOS)
 
-- [ ] Login with credentials from packet
+- [ ] Login with packet credentials
 - [ ] Change password
-- [ ] Review/tighten ACLs if time permits
+- [ ] Verify routing between zones works (do NOT add ACLs until services are green)
+
+### Windows Firewall (each Windows machine)
+
+```powershell
+New-NetFirewallRule -DisplayName "Allow Linux Subnet" -Direction Inbound -RemoteAddress LINUX_SUBNET/24 -Action Allow
+```
+
+### Verify cross-zone works
+
+```bash
+ping <windows-ip>                          # From Linux
+nc -zv <windows-ip> 5985                   # WinRM
+```
+```powershell
+Test-NetConnection <linux-splunk-ip> -Port 9997   # From Windows
+```
 
 ---
 

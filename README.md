@@ -28,8 +28,8 @@ cd C:\ccdc26\dovetail\scripts
 
 ## Architecture
 
-- `monarch/` -- Linux orchestration (Python SSH REPL, dispatches scripts to all hosts)
-- `dovetail/` -- Windows orchestration (PowerShell WinRM dispatcher)
+- `monarch/` -- Linux orchestration ([guide](docs/MONARCH-GUIDE.md)) -- Python SSH REPL, dispatches scripts to all hosts
+- `dovetail/` -- Windows orchestration ([guide](docs/DOVETAIL-GUIDE.md)) -- PowerShell WinRM dispatcher
 - `splunk/` -- SIEM queries and setup
 - `docs/` -- Competition playbooks and reference
 

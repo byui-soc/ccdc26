@@ -9,11 +9,8 @@ def main():
     parser, subparser = get_parser()
     add_subcmd(subparser, "repl", "Enter monarch repl")
     args = parser.parse_args()
-    cmd = args.cmd
-    if cmd is None:
-        parser.print_help()
-        return
-    elif cmd == "repl":
+    cmd = getattr(args, "cmd", None)
+    if cmd is None or cmd == "repl":
         repl()
     else:
         run(parser, args)

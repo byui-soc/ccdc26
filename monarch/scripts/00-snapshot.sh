@@ -3,7 +3,7 @@
 # Takes a complete system baseline before any changes are made
 # SELF-CONTAINED -- no external dependencies
 
-set -euo pipefail
+set -uo pipefail
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

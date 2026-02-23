@@ -126,7 +126,38 @@ else
 fi
 
 #=============================================================================
-phase "3 - SSH Hardening"
+phase "3 - Create Competition User"
+#=============================================================================
+
+COMP_USER="${COMP_USER:-sysadmin}"
+
+if ! id "$COMP_USER" &>/dev/null; then
+    info "Creating sudo user: $COMP_USER"
+    useradd -m -s /bin/bash "$COMP_USER" 2>/dev/null || useradd -m "$COMP_USER" 2>/dev/null
+    echo "$COMP_USER:changeme" | chpasswd 2>/dev/null
+    ok "User $COMP_USER created (password: changeme -- rotate ASAP)"
+else
+    info "User $COMP_USER already exists"
+fi
+
+# Add to sudo/wheel group
+if getent group sudo &>/dev/null; then
+    usermod -aG sudo "$COMP_USER" 2>/dev/null
+    ok "$COMP_USER added to sudo group"
+elif getent group wheel &>/dev/null; then
+    usermod -aG wheel "$COMP_USER" 2>/dev/null
+    ok "$COMP_USER added to wheel group"
+fi
+
+# Ensure sudo works for the user
+if ! grep -q "^${COMP_USER}" /etc/sudoers /etc/sudoers.d/* 2>/dev/null; then
+    echo "${COMP_USER} ALL=(ALL) ALL" > /etc/sudoers.d/ccdc-comp-user
+    chmod 440 /etc/sudoers.d/ccdc-comp-user
+    ok "$COMP_USER granted sudo via sudoers.d"
+fi
+
+#=============================================================================
+phase "4 - SSH Hardening"
 #=============================================================================
 
 SSHD_CONFIG="/etc/ssh/sshd_config"
@@ -140,7 +171,7 @@ AddressFamily inet
 ListenAddress 0.0.0.0
 Protocol 2
 
-PermitRootLogin no
+PermitRootLogin yes
 PubkeyAuthentication yes
 PasswordAuthentication yes
 PermitEmptyPasswords no
@@ -187,7 +218,7 @@ else
 fi
 
 #=============================================================================
-phase "4 - Kernel / Sysctl Hardening"
+phase "5 - Kernel / Sysctl Hardening"
 #=============================================================================
 
 backup_file /etc/sysctl.conf
@@ -244,7 +275,7 @@ done
 ok "Dangerous kernel modules blacklisted"
 
 #=============================================================================
-phase "5 - File Permission Hardening"
+phase "6 - File Permission Hardening"
 #=============================================================================
 
 info "Securing critical files..."
@@ -307,7 +338,7 @@ done
 ok "World-writable files fixed"
 
 #=============================================================================
-phase "6 - Disable Dangerous Services"
+phase "7 - Disable Dangerous Services"
 #=============================================================================
 
 DANGEROUS_SERVICES=(
@@ -349,7 +380,7 @@ if [ "$INIT_SYSTEM" = "systemd" ]; then
 fi
 
 #=============================================================================
-phase "7 - Remove Unnecessary SUID"
+phase "8 - Remove Unnecessary SUID"
 #=============================================================================
 
 REMOVE_SUID=("/usr/bin/wall" "/usr/bin/write" "/usr/bin/chage" "/usr/bin/expiry")
@@ -364,7 +395,7 @@ done
 ok "Unnecessary SUID bits removed"
 
 #=============================================================================
-phase "8 - Clone Toolkit Repository"
+phase "9 - Clone Toolkit Repository"
 #=============================================================================
 
 if [ -d /opt/ccdc26 ]; then
