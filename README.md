@@ -11,10 +11,10 @@ Hardening, monitoring, and incident response for CCDC competition environments.
 ### Linux (from any Linux machine)
 
 ```bash
-git clone https://github.com/byui-soc/ccdc26.git /opt/ccdc26
+sudo git clone https://github.com/byui-soc/ccdc26.git /opt/ccdc26
 cd /opt/ccdc26
 sudo ./deploy.sh --configure
-cd monarch && python3 -m monarch repl
+cd monarch && python3 -m monarch
 > scan SUBNET PASSWORD
 > script 01-harden.sh
 ```

@@ -91,6 +91,7 @@ try {
     New-Item -ItemType Directory -Path $extractPath -Force | Out-Null
     $dest = $shell.Namespace($extractPath)
     $dest.CopyHere($zip.Items(), 0x14)
+    Start-Sleep -Seconds 5
 }
 
 # Handle GitHub's nested folder (ccdc26-main/)
@@ -98,13 +99,8 @@ $nested = Get-ChildItem -Path $extractPath -Directory | Select-Object -First 1
 $sourcePath = if ($nested -and $nested.Name -match '-main$|-master$') { $nested.FullName } else { $extractPath }
 
 # Deploy to destination
-if (Test-Path $DestPath) {
-    Write-Status "Updating existing installation at $DestPath ..."
-    Copy-Item -Path "$sourcePath\*" -Destination $DestPath -Recurse -Force
-} else {
-    Write-Status "Installing to $DestPath ..."
-    Copy-Item -Path $sourcePath -Destination $DestPath -Recurse -Force
-}
+New-Item -ItemType Directory -Path $DestPath -Force | Out-Null
+Copy-Item -Path "$sourcePath\*" -Destination $DestPath -Recurse -Force
 
 # Cleanup
 Remove-Item $zipPath -Force -ErrorAction SilentlyContinue

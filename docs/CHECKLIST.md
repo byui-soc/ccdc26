@@ -22,9 +22,9 @@
 ### Linux Controller (1 person)
 
 - [ ] VNC into Linux workstation
-- [ ] Clone toolkit: `git clone https://github.com/byui-soc/ccdc26.git /opt/ccdc26`
+- [ ] Clone toolkit: `sudo git clone https://github.com/byui-soc/ccdc26.git /opt/ccdc26`
 - [ ] Configure: `cd /opt/ccdc26 && sudo ./deploy.sh --configure`
-- [ ] Start Monarch: `cd monarch && python3 -m monarch repl`
+- [ ] Start Monarch: `cd monarch && python3 -m monarch`
 - [ ] Scan: `scan SUBNET PASSWORD`
 - [ ] Snapshot: `script 00-snapshot.sh`
 
@@ -136,7 +136,7 @@ cd C:\ccdc26\dovetail
 ### Windows Firewall (each Windows machine)
 
 ```powershell
-New-NetFirewallRule -DisplayName "Allow Linux Subnet" -Direction Inbound -RemoteAddress LINUX_SUBNET/24 -Action Allow
+New-NetFirewallRule -DisplayName "Allow Linux Subnet" -Direction Inbound -RemoteAddress <linux-subnet>/24 -Action Allow
 ```
 
 ### Verify cross-zone works

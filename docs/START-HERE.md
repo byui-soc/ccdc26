@@ -12,9 +12,9 @@
 ### LINUX PERSON
 
 ```bash
-git clone https://github.com/byui-soc/ccdc26.git /opt/ccdc26
+sudo git clone https://github.com/byui-soc/ccdc26.git /opt/ccdc26
 cd /opt/ccdc26
-sudo ./deploy.sh --configure     # Fill in IPs from competition packet
+sudo ./deploy.sh --configure     # Fill in Splunk settings from competition packet
 ```
 
 ### WINDOWS PERSON (PowerShell as Admin)
@@ -38,7 +38,7 @@ tar -xzf C:\ccdc26.tar.gz -C C:\
 
 ```bash
 cd /opt/ccdc26/monarch
-python3 -m monarch repl
+python3 -m monarch
 ```
 
 | Step | Command | What it does |
@@ -137,7 +137,7 @@ Change default password.
 After network firewalls are configured, allow Linux subnet through Windows Firewall:
 
 ```powershell
-New-NetFirewallRule -DisplayName "Allow Linux Subnet" -Direction Inbound -RemoteAddress LINUX_SUBNET/24 -Action Allow
+New-NetFirewallRule -DisplayName "Allow Linux Subnet" -Direction Inbound -RemoteAddress <linux-subnet>/24 -Action Allow
 ```
 
 ### Verify cross-zone connectivity
@@ -167,7 +167,7 @@ Test-NetConnection -ComputerName <linux-splunk-ip> -Port 9997    # Splunk
 ### Windows (each machine, or via Dovetail)
 
 ```powershell
-.\03-audit.ps1                  # Quick triage + audit
+.\03-audit.ps1                  # Audit policies + PowerShell logging
 .\04-splunk.ps1                 # Install Splunk forwarder
 .\05-monitor.ps1                # Start real-time monitoring
 ```

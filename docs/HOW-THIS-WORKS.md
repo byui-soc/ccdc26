@@ -403,34 +403,24 @@ don't just trust that everything is fine, you verify it.
 
 ## `config.env` Explained
 
-`config.env` is the single source of truth for your environment. Every
-script reads from it. Fill it in before running anything.
-
-All of these values come from the **competition packet** -- a document
-the organizers hand you at the start of the event.
+`config.env` is a small configuration file with just the settings that
+scripts actually need. Fill it in at competition start.
 
 | Field | What it is | Where to find it |
 |-------|-----------|-----------------|
-| `SPLUNK_SERVER` | IP address of your Splunk machine | Competition packet, network diagram |
-| `SPLUNK_PORT` | The port Splunk listens on for incoming logs. Almost always `9997`. | Don't change unless told to |
-| `SPLUNK_VERSION` | Version of Splunk installed on your server | Run `/opt/splunk/bin/splunk version` on the Splunk box |
-| `SPLUNK_BUILD` | Build hash for the matching Universal Forwarder download | Splunk's download page, or `splunk version` output |
-| `LINUX_SUBNET` | IP range for the Linux zone (e.g., `10.0.1.0/24`) | Competition packet |
-| `WINDOWS_SUBNET` | IP range for the Windows zone (e.g., `10.0.2.0/24`) | Competition packet |
-| `SPLUNK_HOST`, `ECOM_HOST`, etc. | IP addresses of each individual machine | Competition packet |
-| `PALO_ALTO_IP`, `CISCO_FTD_IP`, `VYOS_ROUTER_IP` | IP addresses of network devices | Competition packet |
-| `COMP_ADMIN1`, `COMP_ADMIN2` | Admin usernames the scoring engine logs in with | Competition packet |
-| `COMP_USER1` | Regular user account the scoring engine uses | Competition packet |
-| `TEAM_NUMBER` | Your team's number | Assigned by organizers |
-| `PASSWORD_SALT` | Any phrase your team agrees on ahead of time | Made up by your team |
+| `SPLUNK_SERVER` | IP of your Splunk machine | Competition packet |
+| `SPLUNK_PORT` | Splunk log receiving port | Usually `9997` -- don't change |
+| `SPLUNK_VERSION` | Splunk version on the server | Run `/opt/splunk/bin/splunk version` |
+| `SPLUNK_BUILD` | Build hash for the forwarder download | Same command shows the build hash |
+| `COMP_USER` | Sudo user created on all Linux hosts | Default: `sysadmin` |
+| `CONFIGURED` | Flip to `true` when done | Set after filling in Splunk values |
 
-The `PASSWORD_SALT` is used for deterministic password generation.
-Instead of everyone on the team memorizing random passwords, the toolkit
-generates passwords from the salt. Everyone who knows the salt can
-regenerate the same passwords. Pick something memorable but not obvious.
+**You don't need to put host IPs in config.env.** Monarch discovers hosts
+automatically via `scan`. Record IPs from the competition packet on your
+printed QUICKREF.md credential tables or on paper instead.
 
-Set `CONFIGURED=true` at the bottom of the file after filling everything
-in. Scripts will refuse to run until you do.
+Set `CONFIGURED=true` at the bottom of the file after filling in the
+Splunk values. `deploy.sh` will warn you if it's still `false`.
 
 ---
 

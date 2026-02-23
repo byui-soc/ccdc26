@@ -115,7 +115,9 @@ generate_ps_config() {
             # Pad key for alignment
             local padded
             padded=$(printf "%-20s" "$pascal")
-            entries+="    ${padded}= \"${value}\"\n"
+            local escaped="${value//\`/\`\`}"
+            escaped="${escaped//\"/\`\"}"
+            entries+="    ${padded}= \"${escaped}\"\n"
         fi
     done < "$src"
 

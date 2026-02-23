@@ -1,7 +1,7 @@
 # CCDC Environment Configuration - PowerShell
 # =============================================
 # AUTO-GENERATED from config.env — re-run ./deploy.sh --configure to refresh.
-# Do not edit by hand; edit config.env instead.
+# Primary source of truth is config.env. Changes here (e.g. via Set-EnvironmentConfig) may be overwritten on regeneration.
 
 # BEGIN CONFIG
 $script:EnvConfig = @{

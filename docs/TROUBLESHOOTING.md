@@ -90,7 +90,7 @@ $ cd /opt/ccdc26/monarch/scripts && bash 01-harden.sh
 cd /opt/ccdc26/monarch
 
 # Run directly
-python3 -m monarch repl
+python3 -m monarch
 
 # If module not found, check structure
 ls monarch/__main__.py    # Should exist
