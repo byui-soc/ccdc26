@@ -108,7 +108,7 @@ cd C:\ccdc26\dovetail
 | `00-snapshot.ps1` | Baseline users, services, tasks, ports, hashes |
 | `01-blitz.ps1` | EternalBlue, PrintNightmare, Mimikatz patches. Defender ASR. Disable dangerous services. |
 | `02-ad.ps1` | DC only: Zerologon, noPac, Kerberos hardening, privileged group cleanup |
-| `03-audit.ps1` | Quick triage: sessions, processes, network, services |
+| `03-audit.ps1` | Audit policies, PowerShell logging, command-line auditing, registry SACLs |
 | `04-splunk.ps1` | Install Splunk universal forwarder |
 | `05-monitor.ps1` | Real-time process/network/session monitoring |
 | `hunt-persistence.ps1` | Registry, tasks, WMI, services, COM, SSPs, DLL hijacking |
@@ -196,6 +196,34 @@ Enable-NetAdapter -Name "Ethernet"
 | `config.ps1` | Windows/PS | `$script:EnvConfig` hashtable |
 
 Update these FIRST before running any scripts.
+
+### config.env Fields
+
+| Field | What it is | Where to find it |
+|-------|-----------|-----------------|
+| `SPLUNK_SERVER` | IP address of your Splunk machine | Competition packet |
+| `SPLUNK_PORT` | Splunk receiving port | Usually `9997` (don't change) |
+| `SPLUNK_VERSION` | Splunk version installed on server | Run `/opt/splunk/bin/splunk version` on Splunk server |
+| `SPLUNK_BUILD` | Splunk build hash | Run `/opt/splunk/bin/splunk version` on Splunk server |
+| `LINUX_SUBNET` | Linux zone IP range | Competition packet (e.g. `10.0.1.0/24`) |
+| `WINDOWS_SUBNET` | Windows zone IP range | Competition packet (e.g. `10.0.2.0/24`) |
+| `MANAGEMENT_SUBNET` | Management/scoring subnet | Competition packet |
+| `SPLUNK_HOST` | Splunk server IP | Same as SPLUNK_SERVER usually |
+| `ECOM_HOST` | E-commerce server IP | Competition packet |
+| `WEBMAIL_HOST` | Webmail server IP | Competition packet |
+| `AD_HOST` | Active Directory / DNS server IP | Competition packet |
+| `WEB_WIN_HOST` | Windows web server (IIS) IP | Competition packet |
+| `FTP_HOST` | FTP server IP | Competition packet |
+| `WORKSTATION_HOST` | Workstation IP | Competition packet (may be DHCP) |
+| `PALO_ALTO_IP` | Palo Alto firewall management IP | Competition packet |
+| `CISCO_FTD_IP` | Cisco FTD firewall management IP | Competition packet |
+| `VYOS_ROUTER_IP` | VyOS router IP | Competition packet |
+| `COMP_ADMIN1` | First competition admin username | Competition packet (e.g. `ccdcadmin1`) |
+| `COMP_ADMIN2` | Second competition admin username | Competition packet |
+| `COMP_USER1` | Competition standard user | Competition packet |
+| `TEAM_NUMBER` | Your team number | Assigned at competition |
+| `PASSWORD_SALT` | Any phrase for password generation | Team decides (e.g. `BYU-Tigers-2026`) |
+| `REPO_URL` | Git URL for the toolkit | `https://github.com/byui-soc/ccdc26.git` |
 
 ---
 

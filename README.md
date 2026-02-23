@@ -2,6 +2,8 @@
 
 Hardening, monitoring, and incident response for CCDC competition environments.
 
+**New to the team?** Read [docs/HOW-THIS-WORKS.md](docs/HOW-THIS-WORKS.md) first.
+
 **Competition day?** Read [docs/START-HERE.md](docs/START-HERE.md).
 
 ## Quick Start

@@ -2,6 +2,9 @@
 
 > This is the only doc you need at flag drop. Follow steps in order. No skipping.
 
+> **Monarch** controls all Linux machines from one keyboard via SSH. One command runs on every machine simultaneously.
+> **Dovetail** does the same for Windows machines via WinRM. Both dispatch the numbered scripts (00-05) in order.
+
 ---
 
 ## Step 0: Get the Toolkit (1 min)
@@ -23,9 +26,10 @@ Invoke-WebRequest -Uri "https://github.com/byui-soc/ccdc26/archive/refs/heads/ma
 Expand-Archive C:\ccdc26.zip -DestinationPath C:\; Rename-Item C:\ccdc26-main C:\ccdc26
 
 # Method 2: From Linux controller (if no internet / GitHub blocked)
-# Linux:  cd /opt/ccdc26 && python3 -m http.server 8080
-Invoke-WebRequest -Uri "http://LINUX_IP:8080/ccdc26.zip" -OutFile C:\ccdc26.zip
-Expand-Archive C:\ccdc26.zip -DestinationPath C:\; Rename-Item C:\ccdc26-main C:\ccdc26
+# On Linux first:  cd /opt && tar czf /tmp/ccdc26.tar.gz ccdc26/ && cd /tmp && python3 -m http.server 8080
+# Then on Windows:
+Invoke-WebRequest -Uri "http://LINUX_IP:8080/ccdc26.tar.gz" -OutFile C:\ccdc26.tar.gz
+tar -xzf C:\ccdc26.tar.gz -C C:\
 ```
 
 ---

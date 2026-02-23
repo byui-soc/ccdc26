@@ -2,6 +2,19 @@
 
 Use this when you suspect compromise or need to hunt proactively.
 
+## When to Use This Document
+
+| Situation | Jump to |
+|-----------|---------|
+| "I found a suspicious process" | ["I Found a Suspicious Process"](#i-found-a-suspicious-process) |
+| "Unusual network traffic" | ["I See Unusual Network Traffic"](#i-see-unusual-network-traffic) |
+| "A scored service keeps dying" | ["A Scored Service Is Down"](#a-scored-service-is-down) |
+| "I think an account was compromised" | ["I Think an Account Is Compromised"](#i-think-an-account-is-compromised) |
+| "I need to hunt for backdoors (Linux)" | [Linux Threat Hunting Checklist](#3-linux-threat-hunting-checklist) |
+| "I need to hunt for backdoors (Windows)" | [Windows Threat Hunting Checklist](#4-windows-threat-hunting-checklist) |
+| "What attacks does red team use?" | [Common CCDC Attack Patterns](#5-common-ccdc-attack-patterns) |
+| "Active attacker on the network NOW" | [Active Attacker Detected](#81-active-attacker-detected) |
+
 ---
 
 ## 1. Quick Start -- First 5 Minutes of Hunting
