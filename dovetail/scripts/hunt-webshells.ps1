@@ -103,7 +103,15 @@ function Move-ToQuarantine { param([string]$FilePath)
 
 # ── Main ──
 $webRoots = if ($Path) { @($Path) } else { Get-WebRoots }
-if (-not $webRoots) { Error "No web root found. Use -Path."; exit 1 }
+if (-not $webRoots) {
+    $iisInstalled = (Get-WindowsFeature -Name Web-Server -ErrorAction SilentlyContinue).Installed -eq $true
+    if (-not $iisInstalled) {
+        Info "IIS is not installed on this server. No web roots to scan."
+    } else {
+        Warn "IIS installed but no web roots found. Use -Path to specify one."
+    }
+    exit 0
+}
 Info "Web root(s): $($webRoots -join ', ')"
 
 if ($Baseline) {

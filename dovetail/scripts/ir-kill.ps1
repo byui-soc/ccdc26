@@ -55,16 +55,16 @@ function Get-Sessions {
     if (-not $qwinsta) { $qwinsta = query session 2>$null }
     if (-not $qwinsta) { Warn "Cannot enumerate sessions"; return $sessions }
     foreach ($line in ($qwinsta | Select-Object -Skip 1)) {
-        $line = $line.Trim(); if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
         $isCurrent = $line.StartsWith(">")
         $clean = $line -replace '^\s*>\s*',''
-        $sessionName = $clean.Substring(0, [Math]::Min(19, $clean.Length)).Trim()
-        $rest = if ($clean.Length -gt 19) { $clean.Substring(19) } else { "" }
-        $parts = $rest -split '\s+' | Where-Object { $_ -ne '' }
-        if ($parts.Count -lt 2) { continue }
-        $username = $parts[0]; $id = $null; $state = ""
+        $parts = $clean -split '\s+' | Where-Object { $_ -ne '' }
+        if ($parts.Count -lt 3) { continue }
+        $sessionName = $parts[0]; $username = $null; $id = $null; $state = ""
         if ($parts[1] -match '^\d+$') { $id = [int]$parts[1]; $state = if ($parts.Count -ge 3) { $parts[2] } else { "" } }
+        elseif ($parts.Count -ge 4 -and $parts[2] -match '^\d+$') { $username = $parts[1]; $id = [int]$parts[2]; $state = if ($parts.Count -ge 4) { $parts[3] } else { "" } }
         else { continue }
+        if (-not $username) { continue }
         if ([string]::IsNullOrWhiteSpace($username) -or $username -eq "65536") { continue }
         $type = if ($sessionName -match "rdp-tcp") { "RDP" } else { "Console" }
         $sessions += [PSCustomObject]@{Username=$username;SessionId=$id;SessionName=$sessionName;State=$state;Type=$type;IsCurrent=$isCurrent;SourceIP=""}

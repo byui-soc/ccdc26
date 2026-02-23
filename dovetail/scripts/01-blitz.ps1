@@ -153,26 +153,7 @@ try {
 Log "Windows Defender configured"
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 3. LOLBin OUTBOUND BLOCKING
-# ═══════════════════════════════════════════════════════════════════════════
-Section "LOLBin Outbound Blocking"
-
-$lolbins = @(
-    "mshta.exe", "regsvr32.exe", "wscript.exe", "cscript.exe",
-    "rundll32.exe", "certutil.exe"
-)
-foreach ($bin in $lolbins) {
-    $binPath = "C:\Windows\System32\$bin"
-    $ruleName = "CCDC-Block-Outbound-$($bin -replace '\.exe$','')"
-    Remove-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
-    New-NetFirewallRule -DisplayName $ruleName -Direction Outbound -Program $binPath `
-        -Action Block -Enabled True -Profile Any -ErrorAction SilentlyContinue | Out-Null
-}
-OK "Blocked outbound for $($lolbins.Count) LOLBins"
-Log "LOLBin outbound rules created"
-
-# ═══════════════════════════════════════════════════════════════════════════
-# 4. FIREWALL: NUKE AND REBUILD
+# 3. FIREWALL: NUKE AND REBUILD (must come BEFORE LOLBin rules)
 # ═══════════════════════════════════════════════════════════════════════════
 Section "Firewall Nuke-and-Rebuild"
 
@@ -242,6 +223,25 @@ netsh advfirewall set allprofiles logging allowedconnections enable 2>$null | Ou
 $portList = ($inboundRules | ForEach-Object { "$($_.Port)/$($_.Proto)" } | Sort-Object -Unique) -join ", "
 OK "Firewall rebuilt: default deny inbound, allowed: $portList"
 Log "Firewall rebuilt with ports: $portList"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 4. LOLBin OUTBOUND BLOCKING (after nuke so rules survive)
+# ═══════════════════════════════════════════════════════════════════════════
+Section "LOLBin Outbound Blocking"
+
+$lolbins = @(
+    "mshta.exe", "regsvr32.exe", "wscript.exe", "cscript.exe",
+    "rundll32.exe", "certutil.exe"
+)
+foreach ($bin in $lolbins) {
+    $binPath = "C:\Windows\System32\$bin"
+    $ruleName = "CCDC-Block-Outbound-$($bin -replace '\.exe$','')"
+    Remove-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
+    New-NetFirewallRule -DisplayName $ruleName -Direction Outbound -Program $binPath `
+        -Action Block -Enabled True -Profile Any -ErrorAction SilentlyContinue | Out-Null
+}
+OK "Blocked outbound for $($lolbins.Count) LOLBins"
+Log "LOLBin outbound rules created"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 5. SERVICE LOCKDOWN
@@ -344,7 +344,7 @@ if (-not (Test-Path $dnsClientPath)) { New-Item -Path $dnsClientPath -Force | Ou
 Set-ItemProperty -Path $dnsClientPath -Name "EnableMulticast" -Value 0 -Type DWord -Force
 
 Get-CimInstance -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled=True" -ErrorAction SilentlyContinue | ForEach-Object {
-    $_.SetTcpipNetbios(2) | Out-Null
+    Invoke-CimMethod -InputObject $_ -MethodName SetTcpipNetbios -Arguments @{TcpipNetbiosOptions=[uint32]2} -ErrorAction SilentlyContinue | Out-Null
 }
 OK "LLMNR and NetBIOS disabled"
 Log "LLMNR/NetBIOS disabled"
@@ -383,7 +383,11 @@ foreach ($u in $localUsers) {
 # Disable Guest
 net user Guest /active:no 2>$null | Out-Null
 OK "Guest account disabled"
-OK "Passwords saved to $pwFile"
+if (Test-Path $pwFile) {
+    OK "Passwords saved to $pwFile"
+} else {
+    Info "No other enabled local accounts to rotate"
+}
 Log "Local passwords rotated"
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -474,7 +478,7 @@ $elapsed = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Green
 Write-Host "  BLITZ COMPLETE in $elapsed seconds" -ForegroundColor Green
-Write-Host "  Passwords: $pwFile" -ForegroundColor Green
+if (Test-Path $pwFile) { Write-Host "  Passwords: $pwFile" -ForegroundColor Green }
 Write-Host "  Logs:      $LogDir\blitz.log" -ForegroundColor Green
 Write-Host "================================================================" -ForegroundColor Green
 Write-Host ""

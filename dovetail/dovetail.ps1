@@ -71,7 +71,10 @@ function Connect-Target {
     }
 
     $sessionOpts = @{ ComputerName = $Computer; ErrorAction = 'SilentlyContinue' }
-    if ($NonDomain) { $sessionOpts.Credential = $global:Cred }
+    if ($NonDomain) {
+        $sessionOpts.Credential = $global:Cred
+        $sessionOpts.Authentication = "Basic"
+    }
     if ($port -eq 5986) {
         $sessionOpts.UseSSL = $true
         $sessionOpts.SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationCheck
@@ -119,6 +122,10 @@ if ($Connect) {
 
     if ($NonDomain -and -not $global:Cred) {
         $global:Cred = Get-Credential
+    }
+    if ($NonDomain) {
+        Set-Item WSMan:\localhost\Client\AllowUnencrypted -Value $true -Force -ErrorAction SilentlyContinue
+        Set-Item WSMan:\localhost\Client\TrustedHosts -Value "*" -Force -ErrorAction SilentlyContinue
     }
 
     if ($Repair) {

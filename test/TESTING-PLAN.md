@@ -42,22 +42,22 @@
 
 | Test | Status | Notes |
 |------|--------|-------|
-| Windows Server installed | IN PROGRESS | Installing now |
-| WinRM enabled and reachable | NOT TESTED | |
-| Toolkit copied to C:\ccdc26 | NOT TESTED | |
-| 00-snapshot.ps1 | NOT TESTED | |
-| 01-blitz.ps1 | NOT TESTED | |
-| 02-ad.ps1 (non-DC, should skip) | NOT TESTED | |
-| 03-audit.ps1 | NOT TESTED | |
+| Windows Server installed | PASS | Windows Server 2022 on KVM, hostname WIN-USVJMMIONJ1 |
+| WinRM enabled and reachable | PASS | Basic + NTLM auth, port 5985; NTLM breaks after blitz (expected), Basic works |
+| Toolkit copied to C:\ccdc26 | PASS | HTTP download + tar extraction, all 11 scripts verified |
+| 00-snapshot.ps1 | PASS | 14 files/127KB captured; AD sections skip gracefully on non-DC |
+| 01-blitz.ps1 | PASS | 13 phases in 6.3s; **fixed: LOLBin rules moved after firewall nuke, NetBIOS CIM method, password file msg** |
+| 02-ad.ps1 (non-DC, should skip) | PASS | Silent exit, no errors, no changes |
+| 03-audit.ps1 | PASS | 59 audit subcategories, cmdline auditing, PS logging, firewall logging, registry SACLs |
 | 04-splunk.ps1 (no Splunk server) | NOT TESTED | Expected graceful failure |
-| 05-monitor.ps1 | NOT TESTED | |
-| hunt-persistence.ps1 | NOT TESTED | |
-| hunt-webshells.ps1 (no IIS) | NOT TESTED | |
-| hunt-golden.ps1 | NOT TESTED | |
-| ir-triage.ps1 | NOT TESTED | |
-| ir-kill.ps1 | NOT TESTED | |
-| sanity-check.ps1 | NOT TESTED | |
-| Dovetail dispatch from host | NOT TESTED | |
+| 05-monitor.ps1 | PASS | 3 background jobs started (process/network/session); note: jobs are session-scoped in WinRM |
+| hunt-persistence.ps1 | PASS | All 13 categories execute, 198 findings (expected built-ins), completed in 5.4s |
+| hunt-webshells.ps1 (no IIS) | PASS | **Fixed: now detects IIS not installed and exits 0 with info message** |
+| hunt-golden.ps1 | PASS | Graceful "no suspicious tickets" on standalone server |
+| ir-triage.ps1 | PASS | Shows processes, connections, tasks, filesystem anomalies; 32 findings (DISM temp files) |
+| ir-kill.ps1 | PASS | **Fixed: qwinsta parser no longer truncates usernames**; shows sessions, identifies team members |
+| sanity-check.ps1 | PASS | 26 PASS / 0 FAIL / 0 WARN after blitz |
+| Dovetail dispatch from host | PASS | **Fixed: added Basic auth + AllowUnencrypted for NonDomain mode**; dispatch+collect works |
 | deploy.ps1 bootstrap download | NOT TESTED | |
 
 ---
@@ -542,3 +542,11 @@ Windows: .\sanity-check.ps1
 | Windows VM is standalone (not DC) | Can't test 02-ad.ps1 fully | Need separate DC VM for AD testing |
 | No Splunk server in test environment | Can't test log ingestion | Add Splunk container in future |
 | Docker containers reset on rebuild | Test state lost | Use snapshots for Windows VM |
+| ~~01-blitz.ps1 LOLBin rules deleted by firewall nuke~~ | LOLBin outbound rules lost | **Fixed**: moved LOLBin section after firewall nuke-and-rebuild |
+| ~~01-blitz.ps1 NetBIOS CIM method error~~ | Non-fatal stderr noise | **Fixed**: use Invoke-CimMethod instead of direct method call |
+| ~~hunt-webshells.ps1 exits 1 when no IIS~~ | Confusing error message | **Fixed**: detects IIS absence, exits 0 with info message |
+| ~~ir-kill.ps1 truncates usernames~~ | "dministrator" instead of "Administrator" | **Fixed**: rewrote qwinsta parser to use whitespace splitting |
+| ~~dovetail.ps1 NonDomain auth fails~~ | Cannot dispatch to non-domain targets | **Fixed**: added Basic auth + AllowUnencrypted for NonDomain mode |
+| 01-blitz.ps1 service Stop-Service collection error | Non-fatal stderr noise | Race condition in service enumeration; cosmetic only |
+| 05-monitor.ps1 jobs ephemeral in WinRM | Background jobs die with session | Designed for interactive use; run directly on VM |
+| 01-blitz.ps1 breaks NTLM auth (LmCompatibilityLevel=5) | Can't use NTLM after hardening | Expected; use Basic auth or Kerberos (domain) post-hardening |
