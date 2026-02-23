@@ -274,6 +274,16 @@ for mod in dccp sctp rds tipc cramfs freevxfs hfs hfsplus udf; do
 done
 ok "Dangerous kernel modules blacklisted"
 
+info "Setting nproc limits (fork bomb defense)..."
+cat >> /etc/security/limits.conf << 'LIMEOF'
+# CCDC fork bomb defense
+* soft nproc 1024
+* hard nproc 2048
+root soft nproc unlimited
+root hard nproc unlimited
+LIMEOF
+ok "nproc limits set"
+
 #=============================================================================
 phase "6 - File Permission Hardening"
 #=============================================================================

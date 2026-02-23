@@ -87,6 +87,8 @@ cd C:\ccdc26\dovetail
 
 ### Linux Scripts (monarch/scripts/)
 
+**Core Pipeline** -- run in order via Monarch during initial hardening:
+
 | Script | Purpose |
 |--------|---------|
 | `00-snapshot.sh` | Baseline users, crons, services, ports, hashes |
@@ -95,14 +97,26 @@ cd C:\ccdc26\dovetail
 | `03-services.sh` | Harden Apache, Postfix, DNS, MySQL, etc. |
 | `04-splunk.sh` | Deploy Splunk universal forwarder |
 | `05-monitor.sh` | Deploy file/process/network monitoring |
-| `hunt-persistence.sh` | Full persistence scan (cron, services, users, binaries, startup) |
-| `hunt-pii.sh` | PII/compliance scanner |
-| `ir-triage.sh` | Quick system triage |
-| `ir-kill.sh` | Kill attacker sessions |
-| `ir-collect.sh` | Forensic evidence collection |
-| `ir-isolate.sh` | Network isolation |
+
+**Optional Tools** -- run individually ONLY after Phase 4 service verification:
+
+| Script | Risk | Purpose |
+|--------|------|---------|
+| `hunt-persistence.sh` | LOW | Full persistence scan (cron, services, users, binaries, PAM) |
+| `hunt-pii.sh` | LOW | PII/compliance scanner (SSN, credit cards, emails, phones) |
+| `setup-ids.sh` | LOW | Suricata network IDS -- passive, never drops traffic |
+| `scan-vulns.sh` | LOW | Nuclei CVE scanner (critical/high/medium) |
+| `setup-waf.sh` | MEDIUM | ModSecurity WAF in DetectionOnly mode (logs, does not block) |
+| `update-cms-creds.sh` | MEDIUM | Update DB passwords in OpenCart/WordPress/Joomla/Laravel |
+| `find-ips.sh` | LOW | Find all IP addresses in config files |
+| `ir-triage.sh` | LOW | Quick system triage |
+| `ir-kill.sh` | LOW | Kill attacker sessions |
+| `ir-collect.sh` | LOW | Forensic evidence collection |
+| `ir-isolate.sh` | HIGH | Network isolation (cuts all connectivity!) |
 
 ### Windows Scripts (dovetail/scripts/)
+
+**Core Pipeline** -- run in order on each Windows machine during initial hardening:
 
 | Script | Purpose |
 |--------|---------|
@@ -112,12 +126,18 @@ cd C:\ccdc26\dovetail
 | `03-audit.ps1` | Audit policies, PowerShell logging, command-line auditing, registry SACLs |
 | `04-splunk.ps1` | Install Splunk universal forwarder |
 | `05-monitor.ps1` | Real-time process/network/session monitoring |
-| `hunt-persistence.ps1` | Registry, tasks, WMI, services, COM, SSPs, DLL hijacking |
-| `hunt-webshells.ps1` | IIS webshell detection, baseline, and diff |
-| `hunt-golden.ps1` | Golden ticket / Kerberos ticket analysis |
-| `sanity-check.ps1` | Validate hardening applied correctly |
-| `ir-triage.ps1` | Incident triage |
-| `ir-kill.ps1` | Kill sessions + block IPs |
+
+**Optional Tools** -- run individually ONLY after Phase 4 service verification:
+
+| Script | Risk | Purpose |
+|--------|------|---------|
+| `hunt-persistence.ps1` | LOW | Registry, tasks, WMI, services, COM, SSPs, DLL hijacking |
+| `hunt-webshells.ps1` | LOW | IIS webshell detection, baseline, and diff |
+| `hunt-golden.ps1` | LOW | Golden ticket / Kerberos ticket analysis |
+| `sanity-check.ps1` | LOW | Validate hardening applied correctly |
+| `collect-logs.ps1` | LOW | Archive all event logs + IIS/DNS/firewall logs to ZIP |
+| `ir-triage.ps1` | LOW | Incident triage |
+| `ir-kill.ps1` | LOW | Kill sessions + block IPs |
 
 ### CVEs Patched
 

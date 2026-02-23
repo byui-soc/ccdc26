@@ -224,6 +224,7 @@ Dovetail just lets you do this on ALL machines from one keyboard.
 | `hunt-webshells.ps1` | IIS webshell detection (baseline + diff) |
 | `hunt-golden.ps1` | Golden ticket / Kerberos ticket analysis |
 | `sanity-check.ps1` | Validate hardening applied correctly |
+| `collect-logs.ps1` | Archive all event logs + service logs to ZIP |
 
 ### IR scripts (run during incidents):
 

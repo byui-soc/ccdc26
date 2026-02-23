@@ -332,6 +332,41 @@ information on your network." This script searches for patterns that look
 like Social Security numbers, credit card numbers, and other sensitive
 data.
 
+### `scan-vulns` -- Find unpatched vulnerabilities
+
+Uses Nuclei (a template-based vulnerability scanner) to check your services
+for known CVEs. It downloads the scanner, pulls the latest templates, and
+tests every listening port on the machine. Flags critical and high-severity
+issues with specific remediation suggestions.
+
+### `setup-waf` -- Deploy a Web Application Firewall
+
+Installs ModSecurity with the OWASP Core Rule Set on Apache or Nginx.
+This blocks SQL injection, cross-site scripting (XSS), path traversal,
+and other common web attacks. Starts in blocking mode with paranoia
+level 1 (fewest false positives). If it breaks the scoring engine,
+you can switch it to detection-only mode.
+
+### `setup-ids` -- Deploy a Network Intrusion Detection System
+
+Installs Suricata, which monitors network traffic for known attack
+signatures (like a security camera for your network). Runs in passive
+mode -- it watches and logs, it does NOT block traffic. Logs go to
+`/var/log/suricata/` for Splunk to ingest.
+
+### `update-cms-creds` -- Update web app database passwords
+
+When you rotate MySQL/MariaDB passwords, web applications like OpenCart,
+WordPress, and Joomla store the database password in their config files.
+If you change the DB password but don't update the config, the website
+breaks. This script finds and updates all CMS config files automatically.
+
+### `find-ips` -- Find hardcoded IP addresses
+
+Searches configuration files for IP addresses. Useful when you need to
+find every config that references a specific machine's IP, or when IPs
+change during competition.
+
 ---
 
 ## What the IR Scripts Do

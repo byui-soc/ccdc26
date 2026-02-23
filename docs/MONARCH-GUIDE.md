@@ -250,7 +250,27 @@ Ongoing:
 ```
 > script hunt-persistence.sh         # Hunt for backdoors
 > script hunt-pii.sh                 # PII compliance scan
+> script scan-vulns.sh               # CVE vulnerability scan
 > shell ecom                         # SSH into a specific box
+```
+
+Security tool deployment (when stable):
+
+```
+> script setup-waf.sh                # Deploy ModSecurity WAF on web servers
+> script setup-ids.sh                # Deploy Suricata IDS on all hosts
+```
+
+After DB password rotation:
+
+```
+> script update-cms-creds.sh NewDBPass123    # Update CMS configs
+```
+
+Utilities:
+
+```
+> script find-ips.sh                 # Find hardcoded IPs in configs
 ```
 
 Incident response:

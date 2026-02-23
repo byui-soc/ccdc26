@@ -486,6 +486,22 @@ done
 ok "LD_PRELOAD audit complete"
 
 #=============================================================================
+phase "8 - Binary Integrity Verification"
+#=============================================================================
+
+info "Checking critical service binaries against package manager..."
+if command -v dpkg &>/dev/null; then
+    dpkg --verify 2>/dev/null | grep -E '(sshd|apache|nginx|mysql|postfix|dovecot|named|vsftpd|proftpd)' | while read -r line; do
+        finding "Modified package binary: $line"
+    done
+elif command -v rpm &>/dev/null; then
+    rpm -Va 2>/dev/null | grep -E '(sshd|httpd|nginx|mysql|mariadb|postfix|dovecot|named|vsftpd)' | while read -r line; do
+        finding "Modified package binary: $line"
+    done
+fi
+ok "Binary integrity check complete"
+
+#=============================================================================
 # SUMMARY
 #=============================================================================
 END_TIME=$(date +%s)

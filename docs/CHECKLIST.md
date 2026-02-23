@@ -173,6 +173,36 @@ cd C:\ccdc26\dovetail\scripts
 - [ ] Start monitoring on all Windows machines
 - [ ] Baseline IIS web roots: `.\hunt-webshells.ps1 -Baseline`
 
+### Optional Security Tools -- ONLY AFTER ALL SCORED SERVICES ARE GREEN
+
+> Do NOT run these until Phase 4 service verification passes.
+> Each tool's risk level is noted. If anything breaks scoring, rollback instructions are included.
+
+| Script | Risk | What it does | Rollback |
+|--------|------|--------------|----------|
+| `setup-ids.sh` | LOW | Suricata IDS -- passive network monitoring, never drops traffic | `systemctl stop suricata` |
+| `scan-vulns.sh` | LOW | Nuclei CVE scanner -- read-only, just reports findings | N/A (read-only) |
+| `update-cms-creds.sh` | MEDIUM | Updates DB passwords in OpenCart/WordPress/Joomla configs | Restore config from `.bak` file |
+| `setup-waf.sh` | MEDIUM | ModSecurity WAF in DetectionOnly mode (logs but does NOT block) | See below |
+
+```
+> script setup-ids.sh              # Safe: passive IDS, just watches traffic
+> script scan-vulns.sh             # Safe: read-only CVE scan
+> script update-cms-creds.sh       # Medium: test web app after running
+> script setup-waf.sh              # Medium: log-only by default, web server restarts
+```
+
+**WAF rollback** (if web scoring breaks after setup-waf.sh):
+```bash
+# Option 1: Disable ModSecurity entirely
+sed -i 's/^SecRuleEngine .*/SecRuleEngine Off/' /etc/modsecurity/modsecurity.conf
+systemctl restart apache2   # or: systemctl restart nginx
+
+# Option 2: Restore backup config
+cp /etc/modsecurity/modsecurity.conf.bak.* /etc/modsecurity/modsecurity.conf
+systemctl restart apache2   # or: systemctl restart nginx
+```
+
 ---
 
 ## Phase 7: Persistence Hunting (When Stable)
