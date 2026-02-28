@@ -180,16 +180,24 @@ cd C:\ccdc26\dovetail\scripts
 
 | Script | Risk | What it does | Rollback |
 |--------|------|--------------|----------|
+| `setup-wazuh.sh` | LOW | Wazuh HIDS agent -- FIM, rootkit detection, 3000+ rules | `systemctl stop wazuh-agent` |
 | `setup-ids.sh` | LOW | Suricata IDS -- passive network monitoring, never drops traffic | `systemctl stop suricata` |
 | `scan-vulns.sh` | LOW | Nuclei CVE scanner -- read-only, just reports findings | N/A (read-only) |
 | `update-cms-creds.sh` | MEDIUM | Updates DB passwords in OpenCart/WordPress/Joomla configs | Restore config from `.bak` file |
 | `setup-waf.sh` | MEDIUM | ModSecurity WAF in DetectionOnly mode (logs but does NOT block) | See below |
 
 ```
+> script setup-wazuh.sh            # Safe: agent only, alerts go to manager -> Splunk
 > script setup-ids.sh              # Safe: passive IDS, just watches traffic
 > script scan-vulns.sh             # Safe: read-only CVE scan
 > script update-cms-creds.sh       # Medium: test web app after running
 > script setup-waf.sh              # Medium: log-only by default, web server restarts
+```
+
+### Windows Wazuh Agent
+
+```powershell
+.\setup-wazuh-agent.ps1 -ManagerIP "10.0.x.x"   # Or reads from config.ps1
 ```
 
 **WAF rollback** (if web scoring breaks after setup-waf.sh):

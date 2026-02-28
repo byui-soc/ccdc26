@@ -18,6 +18,9 @@ $script:EnvConfig = @{
     WindowsSubnet    = ""
     ManagementSubnet = ""
 
+    # Wazuh
+    WazuhManager    = ""
+
     # Host IPs
     SplunkHost      = ""
     EcomHost        = ""
