@@ -104,6 +104,7 @@ cd C:\ccdc26\dovetail
 |--------|------|---------|
 | `hunt-persistence.sh` | LOW | Full persistence scan (cron, services, users, binaries, PAM) |
 | `hunt-pii.sh` | LOW | PII/compliance scanner (SSN, credit cards, emails, phones) |
+| `setup-wazuh.sh` | LOW | Wazuh HIDS agent -- FIM, rootkit detection, log analysis -> Splunk |
 | `setup-ids.sh` | LOW | Suricata network IDS -- passive, never drops traffic |
 | `scan-vulns.sh` | LOW | Nuclei CVE scanner (critical/high/medium) |
 | `setup-waf.sh` | MEDIUM | ModSecurity WAF in DetectionOnly mode (logs, does not block) |
@@ -131,6 +132,7 @@ cd C:\ccdc26\dovetail
 
 | Script | Risk | Purpose |
 |--------|------|---------|
+| `setup-wazuh-agent.ps1` | LOW | Wazuh HIDS agent -- event channels, PS logging, audit -> Splunk |
 | `hunt-persistence.ps1` | LOW | Registry, tasks, WMI, services, COM, SSPs, DLL hijacking |
 | `hunt-webshells.ps1` | LOW | IIS webshell detection, baseline, and diff |
 | `hunt-golden.ps1` | LOW | Golden ticket / Kerberos ticket analysis |
@@ -226,6 +228,7 @@ Update these FIRST before running any scripts.
 | `SPLUNK_PORT` | Splunk receiving port | Usually `9997` (don't change) |
 | `SPLUNK_VERSION` | Splunk version on server | Run `/opt/splunk/bin/splunk version` on Splunk server |
 | `SPLUNK_BUILD` | Splunk build hash | Same command shows the build hash |
+| `WAZUH_MANAGER` | IP of Wazuh manager | Same box as Splunk or a dedicated host |
 | `COMP_USER` | Sudo user created on all Linux hosts | Default: `sysadmin` |
 | `CONFIGURED` | Set to `true` when done | Flip to `true` after filling in Splunk values |
 
