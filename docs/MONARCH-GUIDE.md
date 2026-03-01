@@ -62,6 +62,8 @@ root@10.0.1.14:22 (password changeme)
 
 Shows all known hosts with their current user, IP, port, password, and aliases.
 
+Example output (IPs and aliases will match your actual environment):
+
 ```
 > list
 root@10.0.1.11:22 (password changeme, aliases ecom)

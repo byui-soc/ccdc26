@@ -9,30 +9,35 @@
 
 ## Pre-Competition (Night Before / Morning Of)
 
-- [ ] Verify all team accounts on NISE and Stadium portals
+- [ ] Verify all team accounts on competition portals (NISE, Stadium, Nextcloud, etc.)
 - [ ] Print QUICKREF.md -- one copy per team member
-- [ ] Assign machines to people (see Role Assignments below)
+- [ ] Review scripts and docs one more time
+- [ ] Agree on team password scheme (e.g. `Team3-<machine>-<random>!`)
 
 ---
 
-## Phase 1: First 5 Minutes (Critical)
+## Phase 1: Read the Packet + Get Access (First 5 Minutes)
 
-**Goal:** Get onto all machines, change passwords, prevent immediate attacker access.
+**Goal:** Understand what you have, get onto all machines, prevent immediate attacker access.
+
+- [ ] **Read the packet** -- record all IPs, credentials, scored services, topology
+- [ ] Fill in the QUICKREF credential tables (or write on printed copy)
+- [ ] Assign machines to people based on what's in the packet
 
 ### Linux Controller (1 person)
 
-- [ ] VNC into Linux workstation
+- [ ] VNC/SSH into a Linux machine (workstation or whichever has internet)
 - [ ] Clone toolkit: `sudo git clone https://github.com/byui-soc/ccdc26.git /opt/ccdc26`
 - [ ] Configure: `cd /opt/ccdc26 && sudo ./deploy.sh --configure`
 - [ ] Start Monarch: `cd monarch && python3 -m monarch`
-- [ ] Scan: `scan SUBNET PASSWORD`
+- [ ] Scan: `scan SUBNET PASSWORD` (subnet and password from packet)
 - [ ] Snapshot: `script 00-snapshot.sh`
 
 ### Windows Machines (2-3 people in parallel)
 
-- [ ] VNC into each Windows machine
+- [ ] VNC/RDP into each Windows machine
 - [ ] **Immediately** change admin password: `net user administrator "YourTeamP@ss!"`
-- [ ] Deploy toolkit (see Step 0 in START-HERE.md)
+- [ ] Deploy toolkit (see Step 1 in START-HERE.md)
 - [ ] Run snapshot: `cd C:\ccdc26\dovetail\scripts && .\00-snapshot.ps1`
 
 ---
@@ -53,7 +58,7 @@ Changes ALL Linux user passwords + kicks active sessions.
 Get-LocalUser | Where-Object {$_.Enabled} | ForEach-Object { net user $_.Name "YourTeamP@ss!" }
 ```
 
-- [ ] **Report password changes** to scoring (required per rules!)
+- [ ] **Report password changes** to scoring if required by rules
 
 ---
 
@@ -89,64 +94,47 @@ cd C:\ccdc26\dovetail
 
 **Do NOT skip this.** Check that hardening didn't break anything.
 
-| Service | Machine | Port | Quick Test |
-|---------|---------|------|------------|
-| HTTP | [ecom server] | 80 | `curl http://<ip>` |
-| HTTP | [Windows web server] | 80 | Browser check |
-| SMTP | [webmail server] | 25 | `telnet <ip> 25` |
-| POP3 | [webmail server] | 110 | `telnet <ip> 110` |
-| DNS | [AD/DNS server] | 53 | `nslookup <domain> <ip>` |
+Refer to the packet for which services are scored on which machines. Use the generic test table in START-HERE.md. Common scored services include HTTP, HTTPS, DNS, SMTP, POP3, IMAP, FTP, SSH, RDP, LDAP -- but it depends on the environment.
 
-- [ ] Test each service from the scoring engine's perspective
-- [ ] Check Stadium portal for service status
+- [ ] Test each scored service from the scoring engine's perspective
+- [ ] Check scoring portal for service status
 - [ ] If a service is down: restart it, check logs, undo firewall rule if needed
+- [ ] **Fix broken services BEFORE moving on** -- points matter more than hardening
 
 ---
 
 ## Phase 5: Firewall Configuration (Minutes 25-35)
 
-> **CRITICAL from prelims**: Linux and Windows were on SEPARATE subnets.
-> If this is the case again, by default Linux CANNOT reach Windows. You MUST add cross-zone rules
-> or Splunk, toolkit transfers, and all cross-zone management will fail.
+> The network topology varies by competition. You might have one firewall or three,
+> and they could be any vendor. Read the packet to figure out what sits between your
+> machines and the scoring engine.
 
-### Cisco FTD (Windows zone) -- Network Lead from Windows workstation
-
-- [ ] Browse to `https://<cisco-ftd-ip>`, login with packet credentials
-- [ ] Add rule: Scoring (Any -> Windows subnet, ports 53/80/443/21, ICMP)
-- [ ] Add rule: Linux -> Windows (Linux subnet -> Windows subnet, ports 5985/9997)
-- [ ] Add rule: Windows -> Linux (Windows subnet -> Linux subnet, ports 22/9997/8000)
-- [ ] Change default password
-- [ ] Commit/deploy changes
-
-### Palo Alto (Linux zone) -- Network Lead from Linux workstation
-
-- [ ] Browse to `https://<palo-alto-ip>`, login with packet credentials
-- [ ] Add rule: Scoring (Any -> Linux subnet, ports 25/80/110/443, ICMP)
-- [ ] Add rule: Windows -> Linux (Windows subnet -> Linux subnet, ports 22/9997)
-- [ ] Add rule: Linux -> Windows (Linux subnet -> Windows subnet, ports 5985/9997)
-- [ ] Change default password
-- [ ] Commit changes
-
-### Router (VyOS)
+### For Every Firewall / Router in the Packet
 
 - [ ] Login with packet credentials
-- [ ] Change password
-- [ ] Verify routing between zones works (do NOT add ACLs until services are green)
+- [ ] **Change default password immediately**
+- [ ] Add rule: Scoring engine can reach your scored service ports + ICMP
+- [ ] Add rule: Your machines can reach Splunk (port 9997)
+- [ ] If subnets are separated: add cross-zone rules (see START-HERE.md)
+- [ ] Commit / deploy / save changes
 
-### Windows Firewall (each Windows machine)
+### Host Firewalls (Windows)
+
+If Linux and Windows are on different subnets:
 
 ```powershell
 New-NetFirewallRule -DisplayName "Allow Linux Subnet" -Direction Inbound -RemoteAddress <linux-subnet>/24 -Action Allow
 ```
 
-### Verify cross-zone works
+### Verify
 
 ```bash
 ping <windows-ip>                          # From Linux
 nc -zv <windows-ip> 5985                   # WinRM
 ```
+
 ```powershell
-Test-NetConnection <linux-splunk-ip> -Port 9997   # From Windows
+Test-NetConnection <linux-ip> -Port 9997   # From Windows
 ```
 
 ---
@@ -171,7 +159,7 @@ cd C:\ccdc26\dovetail\scripts
 
 - [ ] Verify Splunk server is receiving data
 - [ ] Start monitoring on all Windows machines
-- [ ] Baseline IIS web roots: `.\hunt-webshells.ps1 -Baseline`
+- [ ] Baseline web roots if applicable: `.\hunt-webshells.ps1 -Baseline`
 
 ### Optional Security Tools -- ONLY AFTER ALL SCORED SERVICES ARE GREEN
 
@@ -183,7 +171,7 @@ cd C:\ccdc26\dovetail\scripts
 | `setup-wazuh.sh` | LOW | Wazuh HIDS agent -- FIM, rootkit detection, 3000+ rules | `systemctl stop wazuh-agent` |
 | `setup-ids.sh` | LOW | Suricata IDS -- passive network monitoring, never drops traffic | `systemctl stop suricata` |
 | `scan-vulns.sh` | LOW | Nuclei CVE scanner -- read-only, just reports findings | N/A (read-only) |
-| `update-cms-creds.sh` | MEDIUM | Updates DB passwords in OpenCart/WordPress/Joomla configs | Restore config from `.bak` file |
+| `update-cms-creds.sh` | MEDIUM | Updates DB passwords in CMS configs (if CMS exists) | Restore config from `.bak` file |
 | `setup-waf.sh` | MEDIUM | ModSecurity WAF in DetectionOnly mode (logs but does NOT block) | See below |
 
 ```
@@ -229,44 +217,46 @@ cd C:\ccdc26\dovetail\scripts
 .\hunt-webshells.ps1 -Compare
 ```
 
-- [ ] Hunt persistence on AD/DNS server
-- [ ] Hunt persistence on Windows web server
-- [ ] Hunt persistence on all Linux hosts
-- [ ] Scan for webshells on IIS servers
+- [ ] Hunt persistence on every machine
+- [ ] Scan for webshells on any machine running a web server
 
 ---
 
 ## Ongoing Priorities
 
-1. **Monitor Stadium portal** for service status
-2. **Watch for injects** on NISE portal
+1. **Monitor scoring portal** for service status
+2. **Watch for injects** on competition portal
 3. **Check `w` / `query user`** periodically for unauthorized sessions
 4. **Re-run persistence hunts** after incidents
-5. **Scan for webshells** periodically: `.\hunt-webshells.ps1 -Compare`
+5. **Scan for webshells** periodically on web servers
 6. **Check monitoring** alerts: `.\05-monitor.ps1 -Status`
 
 ---
 
-## Role Assignments (Suggested)
+## Role Assignments (Suggested -- adapt to your team size and the environment)
 
 | Role | Primary Tasks | Machines |
 |------|---------------|----------|
-| **Linux Lead** | Monarch controller, Linux hardening, Splunk server | Ubuntu Wks (controller), Ecom, Webmail, Splunk |
-| **Windows Lead** | AD hardening, Dovetail dispatch, DNS service | AD/DNS 2019, Win11 Wks |
-| **Web Lead** | IIS hardening, web services, webshell hunting | Web 2019 |
-| **Network Lead** | Firewall rules, VyOS | Palo Alto, Cisco FTD, VyOS |
-| **Inject/Flex** | Handle injects, backup IR | Float between tasks |
+| **Linux Lead** | Monarch controller, Linux hardening, Splunk oversight | Controller machine + all Linux hosts via Monarch |
+| **Windows Lead** | AD hardening, Dovetail dispatch, Windows services | DC + all Windows hosts via Dovetail |
+| **Services Lead** | Verify scored services, fix breakages, web app hardening | Whichever machines run scored services |
+| **Network Lead** | Firewall rules, router config, cross-zone connectivity | All network devices from packet |
+| **Inject / Flex** | Handle injects, backup IR, assist wherever needed | Float between tasks |
+
+> Adjust roles based on team size. With 3 people, combine Linux Lead + Network Lead
+> and Windows Lead + Services Lead.
 
 ---
 
 ## Machine Quick Reference
 
-**Fill in from competition packet. See also `config.env`.**
+**Fill in from competition packet.**
 
 ### Linux Hosts
 
 | Machine | IP | User | Scored Services |
 |---------|-----|------|-----------------|
+| | | | |
 | | | | |
 | | | | |
 | | | | |
@@ -278,22 +268,25 @@ cd C:\ccdc26\dovetail\scripts
 | | | | |
 | | | | |
 | | | | |
+| | | | |
 
 ### Network Devices
 
-| Device | IP | Access From | User |
-|--------|-----|-------------|------|
-| | | | |
-| | | | |
-| | | | |
+| Device | Type | IP | Access From | User |
+|--------|------|----|-------------|------|
+| | | | | |
+| | | | | |
+| | | | | |
 
 ---
 
 ## Rules Reminders
 
+These are typical CCDC rules. **Confirm against the actual rulebook at competition.**
+
 - Do NOT change IP addresses
 - Do NOT scan other teams (instant DQ)
 - MUST keep ICMP enabled
-- MUST report password changes (except root/admin)
-- MAX 3 VM scrubs (with penalty)
-- Injects submitted as PDF
+- MUST report password changes (except root/admin typically)
+- VM scrubs have limited count and scoring penalty
+- Injects submitted as PDF (usually)

@@ -493,7 +493,7 @@ Unusual network traffic detected
 │  │       Alert the person managing that box.
 │  └─ NO → Possible C2 beacon or exfil
 │         Block the IP immediately at the host firewall
-│         Block at Palo Alto / Cisco FTD if possible
+│         Block at zone firewall(s) if possible
 ├─ Kill the process
 ├─ Check for persistence that will re-establish the connection
 │  ├─ Linux: cron, services, profile scripts
@@ -664,7 +664,7 @@ index=* sourcetype=*dns*
 3. **Kill their session**
    - Linux: `pkill -9 -u <user>` or `> script ir-kill.sh`
    - Windows: `.\ir-kill.ps1`
-4. **Block their IP** at the host AND at the firewall (Palo Alto / Cisco FTD)
+4. **Block their IP** at the host AND at the zone firewall(s)
    - Linux: `iptables -I INPUT -s <IP> -j DROP && iptables -I OUTPUT -d <IP> -j DROP`
    - Windows: `New-NetFirewallRule -DisplayName "Block" -Direction Inbound -RemoteAddress <IP> -Action Block`
 5. **Change passwords** for any accounts they touched
@@ -686,23 +686,23 @@ index=* sourcetype=*dns*
    - Linux (Monarch): `> rotate`
    - Windows: run `.\ir-kill.ps1` on each
 4. **Hunt persistence on every machine** -- divide team members
-5. **Block attacker IP(s)** at both firewalls (Palo Alto + Cisco FTD) -- this stops them from ALL machines at once
+5. **Block attacker IP(s)** at all zone firewalls -- this stops them from ALL machines at once
 6. **Deploy monitoring** on all boxes to catch re-entry
-7. **Consider VM scrub** if a machine is deeply compromised (max 3 scrubs, costs points)
+7. **Consider VM scrub** if a machine is deeply compromised (limited count, costs points)
 
 ### 8.3 Ransomware / Wiper Detected
 
 **Situation:** Files being encrypted or deleted en masse.
 
 1. **IMMEDIATELY** isolate the machine from the network
-   - Linux: `sudo ip link set ens18 down`
+   - Linux: `sudo ip link set <iface> down` (find name with `ip link show`)
    - Windows: `Disable-NetAdapter -Name "Ethernet" -Confirm:$false`
 2. **Kill the encrypting/deleting process** -- `kill -9` / `Stop-Process -Force`
 3. **Assess damage** -- are scored service files intact?
 4. **If scored service data is destroyed** → VM scrub is likely fastest recovery
 5. **If caught early** → restore from backups/package manager, restart services
 6. **Bring network back up carefully** after removing malware
-   - Linux: `sudo ip link set ens18 up`
+   - Linux: `sudo ip link set <iface> up`
    - Windows: `Enable-NetAdapter -Name "Ethernet"`
 7. **Hunt for the entry point** -- how did ransomware get in?
 

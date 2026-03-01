@@ -16,6 +16,9 @@
 |---------|-----|------|----------|-----------------|
 | | | | | |
 | | | | | |
+| | | | | |
+| | | | | |
+| | | | | |
 
 ### Windows Hosts
 
@@ -23,12 +26,17 @@
 |---------|-----|------|----------|-----------------|
 | | | | | |
 | | | | | |
+| | | | | |
+| | | | | |
+| | | | | |
 
 ### Network Devices
 
-| Device | IP | Access From | User | Password |
-|--------|-----|-------------|------|----------|
-| | | | | |
+| Device | Type | IP | Access From | User | Password |
+|--------|------|----|-------------|------|----------|
+| | | | | | |
+| | | | | | |
+| | | | | | |
 
 ---
 
@@ -94,7 +102,7 @@ cd C:\ccdc26\dovetail
 | `00-snapshot.sh` | Baseline users, crons, services, ports, hashes |
 | `01-harden.sh` | SSH lockdown, kernel hardening, permissions, sysctl |
 | `02-firewall.sh` | iptables/ufw rules for scored services |
-| `03-services.sh` | Harden Apache, Postfix, DNS, MySQL, etc. |
+| `03-services.sh` | Harden detected services (web, mail, DNS, DB, etc.) |
 | `04-splunk.sh` | Deploy Splunk universal forwarder |
 | `05-monitor.sh` | Deploy file/process/network monitoring |
 
@@ -200,8 +208,9 @@ Get-NetTCPConnection | Where-Object {$_.State -eq "Established"}
 ### Network interface control
 
 ```bash
-sudo ip link set ens18 down                      # Isolate
-sudo ip link set ens18 up                        # Reconnect
+# Find your interface name first: ip link show
+sudo ip link set <iface> down                    # Isolate
+sudo ip link set <iface> up                      # Reconnect
 ```
 
 ```powershell
@@ -240,19 +249,27 @@ Update these FIRST before running any scripts.
 
 ## RULES
 
+**Confirm against the actual rulebook at competition.** Typical CCDC rules:
+
 - Do NOT change IP addresses
 - Do NOT scan other teams (instant DQ)
 - MUST keep ICMP enabled
-- MUST report password changes (except root/admin)
-- MAX 3 VM scrubs (with penalty)
-- Injects submitted as PDF
+- MUST report password changes (except root/admin typically)
+- VM scrubs have limited count and scoring penalty
+- Injects submitted as PDF (usually)
 
 ---
 
 ## SCORED SERVICES
 
-| Service | Port | Server |
-|---------|------|--------|
-| | | |
-| | | |
-| | | |
+**Fill in from competition packet.**
+
+| Service | Port | Server | Quick Test |
+|---------|------|--------|------------|
+| | | | |
+| | | | |
+| | | | |
+| | | | |
+| | | | |
+| | | | |
+| | | | |
