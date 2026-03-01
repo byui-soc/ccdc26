@@ -134,7 +134,7 @@ Get-NetFirewallRule -Name "*WinRM*" | Where-Object { $_.Enabled -eq $true }
 New-NetFirewallRule -DisplayName "WinRM" -Direction Inbound -LocalPort 5985 -Protocol TCP -Action Allow
 ```
 
-3. If cross-zone (Linux → Windows), configure Cisco FTD to allow source subnet → target port 5985
+3. If cross-zone (Linux → Windows), configure the zone firewall to allow source subnet → target port 5985
 
 ### Problem: WinRM authentication fails
 
@@ -185,9 +185,9 @@ New-NetFirewallRule -DisplayName "WinRM from DC" -Direction Inbound -RemoteAddre
 
 ### Problem: Linux hosts cannot reach Windows hosts
 
-**Root causes:** Cisco FTD blocking cross-zone, Windows Firewall, WinRM not enabled.
+**Root causes:** Zone firewall blocking cross-zone traffic, Windows Firewall, WinRM not enabled.
 
-1. Configure Cisco FTD: Allow Linux subnet → Windows subnet (TCP 5985, ICMP)
+1. Configure zone firewall: Allow Linux subnet → Windows subnet (TCP 5985, ICMP)
 2. On Windows hosts:
 
 ```powershell
@@ -198,7 +198,7 @@ New-NetFirewallRule -DisplayName "Allow Linux Subnet" -Direction Inbound -Remote
 
 ### Problem: Windows hosts cannot reach Linux hosts
 
-1. Check Palo Alto rules: Allow Windows subnet → Linux subnet
+1. Check zone firewall rules: Allow Windows subnet → Linux subnet
 2. On Linux hosts:
 
 ```bash

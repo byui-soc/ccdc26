@@ -276,7 +276,7 @@ Usually means the session timed out. Reconnect:
 
 ### Cross-zone (Linux -> Windows) WinRM doesn't work
 
-This requires the Cisco FTD firewall to allow TCP 5985 from the Linux
+This requires the zone firewall to allow TCP 5985 from the Linux
 subnet to the Windows subnet. See the firewall section in START-HERE.md.
 
 Dovetail is designed to run FROM a Windows machine TO other Windows machines

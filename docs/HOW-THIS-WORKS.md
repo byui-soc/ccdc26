@@ -35,65 +35,76 @@ patched critical vulnerabilities by then, red team is already inside.
 
 ## The Competition Network
 
-### Two Zones
+### What to Expect
 
-The network is split into two halves, separated by firewalls:
+Every CCDC environment is different, but they follow a pattern. You'll
+get a "competition packet" at flag drop that tells you what machines you
+have, their IPs, and what services are scored. Read it carefully.
 
-- **Linux zone** -- servers running Linux (various distributions)
-- **Windows zone** -- servers running Windows, centered around Active
-  Directory
+### Typical Setup
 
-Think of it like an office with two departments, each behind its own
-locked door.
+The network usually has:
 
-### The Machines
+- **Linux servers** -- various distributions running scored services
+  (web servers, email, databases, etc.)
+- **Windows servers** -- usually centered around Active Directory, with
+  one or more domain controllers plus member servers
+- **Network devices** -- firewalls and/or routers separating zones
+- **A scoring engine** -- sits outside your network and periodically
+  tests your services
 
-**Linux zone:**
+Think of it like a small company network. You're the IT team.
 
-| Machine | What it does |
-|---------|-------------|
-| E-commerce server | A web store (think: a small online shop). Scored service. |
-| Webmail server | Email server (like a company's internal Gmail). Scored service. |
-| Splunk server | SIEM -- a log aggregation tool. Think of it as a security camera system that records everything happening on every machine. |
-| Workstation | A general-purpose Linux desktop. |
+### Common Machine Types
 
-**Windows zone:**
+**Linux machines you might see:**
 
-| Machine | What it does |
-|---------|-------------|
-| Active Directory / DNS (DC) | The "brain" of the Windows network. Controls user accounts, group policies, and DNS (the system that translates names like `mail.company.com` into IP addresses). If this falls, the attacker owns everything. |
-| Web server (IIS) | A Windows-based website. Scored service. |
-| FTP server | File Transfer Protocol -- lets users upload/download files. Scored service. |
-| Workstation | A general-purpose Windows desktop. |
+| Type | What it does |
+|------|-------------|
+| Web server | E-commerce, CMS (WordPress, Joomla), or custom web app. Usually scored. |
+| Mail server | Email (Postfix, Dovecot). Usually scored (SMTP/POP3/IMAP). |
+| DNS server | Sometimes a standalone Linux DNS. Scored if present. |
+| Database server | MySQL/MariaDB/PostgreSQL backing a web app. |
+| Splunk / SIEM server | Log aggregation. Think of it as security cameras for every machine. |
+| Workstation | General-purpose Linux desktop. |
 
-**Network devices:**
+**Windows machines you might see:**
 
-| Device | What it does |
-|--------|-------------|
-| Palo Alto firewall | Guards the Linux zone. Controls what traffic goes in and out. |
-| Cisco FTD firewall | Guards the Windows zone. Same idea, different vendor. |
-| VyOS router | Connects the two zones to each other and to the outside world. Think of it as the building's front door. |
+| Type | What it does |
+|------|-------------|
+| Domain Controller (DC) | The "brain" of the Windows network. Controls user accounts, group policies, and usually DNS. **If this falls, the attacker owns everything.** |
+| Web server (IIS) | A Windows-based website. Usually scored. |
+| File server / FTP | File sharing. Sometimes scored. |
+| Workstation | General-purpose Windows desktop. |
 
-### How It All Connects
+**Network devices you might see:**
+
+| Type | What it does |
+|------|-------------|
+| Firewall (any vendor) | Controls what traffic goes in/out. Could be Palo Alto, Cisco FTD/ASA, pfSense, FortiGate, etc. |
+| Router | Connects zones to each other and to the outside. Could be VyOS, Cisco IOS, etc. |
+
+### How It All Connects (Typical)
 
 ```
                   [Scoring Engine]
                         |
-                   [Router / VyOS]
-                   /            \
-            [Palo Alto]     [Cisco FTD]
-                 |                |
-          [Linux Zone]     [Windows Zone]
-           - Ecom            - AD/DNS (DC)
-           - Webmail         - Web (IIS)
-           - Splunk          - FTP
-           - Workstation     - Workstation
+                     [Router]
+                    /        \
+            [Firewall A]   [Firewall B]
+                 |               |
+           [Zone 1]        [Zone 2]
+           - Linux hosts    - Windows hosts
 ```
 
-The scoring engine sits outside your network. It sends traffic through the
-router, through the firewalls, and into your machines. If any link in that
-chain is broken, the scoring engine can't reach your services and you lose
-points.
+The zones might be on different subnets with firewalls between them,
+or everything might be flat on one network. **The packet tells you.**
+The scoring engine sits outside and sends traffic through. If any link
+in the chain is broken, it can't reach your services and you lose points.
+
+> **Key takeaway:** Don't assume anything about the topology until you
+> read the packet. Our scripts are designed to work regardless of the
+> specific layout.
 
 ### The Red Team
 
@@ -447,6 +458,7 @@ scripts actually need. Fill it in at competition start.
 | `SPLUNK_PORT` | Splunk log receiving port | Usually `9997` -- don't change |
 | `SPLUNK_VERSION` | Splunk version on the server | Run `/opt/splunk/bin/splunk version` |
 | `SPLUNK_BUILD` | Build hash for the forwarder download | Same command shows the build hash |
+| `WAZUH_MANAGER` | IP of Wazuh manager (if using Wazuh) | Same box as Splunk or a dedicated host |
 | `COMP_USER` | Sudo user created on all Linux hosts | Default: `sysadmin` |
 | `CONFIGURED` | Flip to `true` when done | Set after filling in Splunk values |
 

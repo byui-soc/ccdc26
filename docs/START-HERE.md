@@ -7,14 +7,33 @@
 
 ---
 
-## Step 0: Get the Toolkit (1 min)
+## Step 0: Read the Packet (First 2 Minutes)
+
+Before touching anything, open the competition packet and record:
+
+| Info | Value | Where to write it |
+|------|-------|--------------------|
+| **Your subnet(s)** | _____________ | `config.env`, printed QUICKREF |
+| **Machine IPs + roles** | _____________ | QUICKREF credential tables |
+| **Default credentials** | _____________ | QUICKREF credential tables |
+| **Scored services per machine** | _____________ | QUICKREF scored services table |
+| **Firewall / router IPs + creds** | _____________ | QUICKREF network devices table |
+| **Splunk server IP** | _____________ | `config.env` → `SPLUNK_SERVER` |
+| **Scoring engine URL** | _____________ | Bookmark in browser |
+| **Rules / restrictions** | _____________ | Read aloud to team |
+
+Assign machines to people immediately. The person with the most Linux machines becomes Linux Lead (runs Monarch). Someone with DC access becomes Windows Lead (runs Dovetail).
+
+---
+
+## Step 1: Get the Toolkit (1 min)
 
 ### LINUX PERSON
 
 ```bash
 sudo git clone https://github.com/byui-soc/ccdc26.git /opt/ccdc26
 cd /opt/ccdc26
-sudo ./deploy.sh --configure     # Fill in Splunk settings from competition packet
+sudo ./deploy.sh --configure     # Fill in Splunk IP + any other values from packet
 ```
 
 ### WINDOWS PERSON (PowerShell as Admin)
@@ -34,7 +53,7 @@ tar -xzf C:\ccdc26.tar.gz -C C:\
 
 ---
 
-## LINUX PERSON (Minutes 0-15)
+## LINUX PERSON (Minutes 2-15)
 
 ```bash
 cd /opt/ccdc26/monarch
@@ -48,11 +67,14 @@ python3 -m monarch
 | 3 | `rotate` | Change ALL passwords + kick sessions |
 | 4 | `script 01-harden.sh` | SSH lockdown, kernel hardening, permissions |
 | 5 | `script 02-firewall.sh` | iptables/ufw on all hosts |
-| 6 | `script 03-services.sh` | Harden running services (Apache, Postfix, DNS, etc.) |
+| 6 | `script 03-services.sh` | Harden running services (auto-detects what's installed) |
+
+> `03-services.sh` detects which services are running and hardens only those.
+> It does NOT assume specific services exist.
 
 ---
 
-## WINDOWS PERSON (Minutes 0-15, parallel)
+## WINDOWS PERSON (Minutes 2-15, parallel)
 
 ```powershell
 cd C:\ccdc26\dovetail\scripts
@@ -62,7 +84,7 @@ cd C:\ccdc26\dovetail\scripts
 |------|---------|--------------|
 | 1 | `.\00-snapshot.ps1` | Baseline users, services, tasks, ports |
 | 2 | `.\01-blitz.ps1` | Harden this machine (CVE patches, Defender, services) |
-| 3 | `.\02-ad.ps1` | Domain Controller hardening (Zerologon, noPac, Kerberos) |
+| 3 | `.\02-ad.ps1` | **Domain Controller ONLY** -- Zerologon, noPac, Kerberos |
 | 4 | Repeat on each Windows machine | Or use Dovetail from DC to dispatch |
 
 **Dovetail dispatch (from DC, after hardening all machines):**
@@ -77,64 +99,55 @@ cd C:\ccdc26\dovetail
 
 ## Verify Scored Services (Minutes 15-20)
 
+**Do NOT skip this.** Check every scored service listed in the packet.
+
+The exact services will vary -- use the table from the packet. Common quick tests:
+
 | Service | Quick Test |
 |---------|-----------|
-| HTTP (Linux) | `curl -s http://<ecom-ip>` |
-| HTTP (Windows/IIS) | Browse to `http://<web-win-ip>` |
-| SMTP | `telnet <webmail-ip> 25` |
-| POP3 | `telnet <webmail-ip> 110` |
-| DNS | `nslookup <domain> <ad-ip>` |
+| HTTP / HTTPS | `curl -sk http://<ip>` or browse to it |
+| SMTP | `nc -zv <ip> 25` |
+| POP3 / IMAP | `nc -zv <ip> 110` or `nc -zv <ip> 143` |
+| DNS | `nslookup <domain> <dns-ip>` |
+| FTP | `nc -zv <ip> 21` |
+| SSH | `nc -zv <ip> 22` |
+| RDP | `nc -zv <ip> 3389` |
+| AD / LDAP | `nc -zv <ip> 389` |
 
-- [ ] Check Stadium portal for green checks
+- [ ] Check scoring portal for green checks
 - [ ] If a service is down: restart it, check logs, undo firewall rule if needed
+- [ ] **Fix broken services BEFORE continuing** -- points > hardening
 
 ---
 
 ## Firewalls (Minutes 20-30)
 
-> **CRITICAL**: Linux and Windows are on SEPARATE subnets with firewalls between them.
-> By default, Linux CANNOT reach Windows. You must open cross-zone rules or
-> Splunk forwarders, toolkit transfers, and management won't work between zones.
+> The network topology varies by competition. Read the packet carefully to identify
+> what firewalls/routers sit between your machines and the scoring engine.
 
-### Cisco FTD (Windows zone) -- access from Windows workstation
+### General Approach
 
-Browse to `https://<cisco-ftd-ip>`, login with packet credentials.
+1. **Identify the firewall(s)**: The packet will list firewall/router IPs and credentials. Could be Palo Alto, Cisco FTD/ASA, pfSense, FortiGate, VyOS, or anything else.
 
-**Required rules (add these):**
+2. **Login and change default passwords first.**
 
-| Rule | Source | Destination | Ports | Why |
-|------|--------|-------------|-------|-----|
-| Scoring inbound | Any | Windows subnet | 53, 80, 443, 21 | Scored services |
-| ICMP | Any | Windows subnet | ICMP | Required by rules |
-| Linux -> Windows | Linux subnet | Windows subnet | 5985, 9997 | WinRM + Splunk |
-| Windows -> Linux | Windows subnet | Linux subnet | 22, 9997, 8000 | SSH + Splunk |
+3. **Add rules in this priority order:**
 
-Change default password.
+| Priority | Rule | Why |
+|----------|------|-----|
+| 1 | Scoring engine -> your machines (scored service ports + ICMP) | **Scored services must be reachable** |
+| 2 | Your machines -> Splunk server (9997) | Log forwarding |
+| 3 | Cross-zone if applicable (Linux <-> Windows on management ports) | Toolkit + Splunk cross-zone |
+| 4 | Outbound for updates if allowed (80/443 temporarily) | Package downloads |
 
-### Palo Alto (Linux zone) -- access from Linux workstation
+4. **Common cross-zone ports** (only if Linux and Windows are on separate subnets):
 
-Browse to `https://<palo-alto-ip>`, login with packet credentials.
+| Direction | Ports | Why |
+|-----------|-------|-----|
+| Linux -> Windows | 5985 (WinRM), 9997 (Splunk) | Management + logs |
+| Windows -> Linux | 22 (SSH), 9997 (Splunk), 8000 (Splunk web) | Management + logs |
 
-**Required rules (add these):**
-
-| Rule | Source | Destination | Ports | Why |
-|------|--------|-------------|-------|-----|
-| Scoring inbound | Any | Linux subnet | 25, 80, 110, 443 | Scored services |
-| ICMP | Any | Linux subnet | ICMP | Required by rules |
-| Windows -> Linux | Windows subnet | Linux subnet | 22, 9997 | SSH + Splunk |
-| Linux -> Windows | Linux subnet | Windows subnet | 5985, 9997 | WinRM + Splunk |
-
-Change default password.
-
-### Router (VyOS)
-
-- [ ] Login with packet credentials → Change password
-- [ ] Verify NAT/routing between zones is working
-- [ ] Do NOT add restrictive ACLs until scored services are confirmed green
-
-### Windows Firewall (on each Windows machine)
-
-After network firewalls are configured, allow Linux subnet through Windows Firewall:
+5. **If Windows machines have host firewalls** that block your Linux subnet:
 
 ```powershell
 New-NetFirewallRule -DisplayName "Allow Linux Subnet" -Direction Inbound -RemoteAddress <linux-subnet>/24 -Action Allow
@@ -143,14 +156,14 @@ New-NetFirewallRule -DisplayName "Allow Linux Subnet" -Direction Inbound -Remote
 ### Verify cross-zone connectivity
 
 ```bash
-# From Linux controller:
-ping <windows-ad-ip>                    # Should work after firewall rules
-nc -zv <windows-ad-ip> 5985            # WinRM port
+# From Linux:
+ping <windows-ip>
+nc -zv <windows-ip> 5985
 ```
 
 ```powershell
 # From Windows:
-Test-NetConnection -ComputerName <linux-splunk-ip> -Port 9997    # Splunk
+Test-NetConnection -ComputerName <linux-ip> -Port 9997
 ```
 
 ---
@@ -172,6 +185,9 @@ Test-NetConnection -ComputerName <linux-splunk-ip> -Port 9997    # Splunk
 .\05-monitor.ps1                # Start real-time monitoring
 ```
 
+- [ ] Verify Splunk server is receiving data (check `index=* | stats count by host`)
+- [ ] Confirm monitoring is active on all machines
+
 ---
 
 ## Ongoing Threat Hunting
@@ -186,7 +202,7 @@ Test-NetConnection -ComputerName <linux-splunk-ip> -Port 9997    # Splunk
 
 ```powershell
 .\hunt-persistence.ps1          # Registry, tasks, WMI, services, COM, SSPs
-.\hunt-webshells.ps1 -Baseline  # Baseline IIS web roots (do early!)
+.\hunt-webshells.ps1 -Baseline  # Baseline web roots -- do this early!
 .\hunt-webshells.ps1 -Compare   # Diff against baseline (run periodically)
 ```
 
@@ -248,12 +264,14 @@ Restart-Service <name>                                  # Windows
 
 ## Rules Reminders
 
+These are typical CCDC rules. **Confirm against the actual rulebook at competition.**
+
 - Do NOT change IP addresses
 - Do NOT scan other teams (instant DQ)
 - MUST keep ICMP enabled
 - MUST report password changes to scoring (except root/admin)
-- MAX 3 VM scrubs (with penalty)
-- Injects submitted as PDF
+- VM scrubs have a limited count and scoring penalty
+- Injects submitted as PDF (usually)
 
 ---
 
